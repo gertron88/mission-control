@@ -1,0 +1,775 @@
+// Mission Control - Autonomous Project Operations Layer
+// Database Schema v2.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PORTFOLIO - Top-level strategic container
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Portfolio {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?  @db.Text
+  
+  // Strategy & Constraints
+  strategy        String?  @db.Text
+  budgetTotal     Decimal? @db.Decimal(10, 2)
+  budgetUsed      Decimal  @default(0) @db.Decimal(10, 2)
+  priorities      Json?    // Priority scoring rules
+  capacityRules   Json?    // Agent capacity allocation rules
+  
+  // Relations
+  projects        Project[]
+  
+  // Metadata
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROJECT - Individual managed initiative
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Project {
+  id              String   @id @default(cuid())
+  portfolioId     String
+  portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
+  
+  // Identity
+  name            String
+  charter         String?  @db.Text
+  description     String?  @db.Text
+  
+  // Objectives & Success
+  objectives      Json?    // Array of objective objects
+  successMetrics  Json?    // KPIs and targets
+  
+  // State Management
+  state           ProjectState @default(PROPOSED)
+  stateHistory    Json?    // Array of {state, timestamp, reason}
+  
+  // Planning
+  milestoneGraph  Json?    // DAG of milestones
+  plannedStart    DateTime?
+  plannedEnd      DateTime?
+  actualStart     DateTime?
+  actualEnd       DateTime?
+  
+  // Budget & Resources
+  budgetAllocated Decimal? @db.Decimal(10, 2)
+  budgetSpent     Decimal  @default(0) @db.Decimal(10, 2)
+  
+  // Relations
+  milestones      Milestone[]
+  tasks           Task[]
+  decisions       Decision[]
+  risks           Risk[]
+  artifacts       Artifact[]
+  
+  // Project Memory
+  memory          Json?    // Persistent project knowledge
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([portfolioId, state])
+  @@index([state])
+}
+
+enum ProjectState {
+  PROPOSED
+  APPROVED
+  PLANNING
+  EXECUTING
+  BLOCKED
+  AWAITING_REVIEW
+  DEPLOYING
+  MONITORING
+  COMPLETED
+  ROLLBACK
+  FAILED
+  ARCHIVED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MILESTONE - Outcome checkpoint within a project
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Milestone {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  name            String
+  description     String?  @db.Text
+  
+  // Sequencing
+  sequence        Int
+  dependencies    String[] // Array of milestone IDs
+  
+  // State
+  state           MilestoneState @default(PLANNED)
+  
+  // Timeline
+  plannedDate     DateTime?
+  actualDate      DateTime?
+  
+  // Relations
+  tasks           Task[]
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([projectId, state])
+  @@index([state])
+}
+
+enum MilestoneState {
+  PLANNED
+  IN_PROGRESS
+  COMPLETE
+  BLOCKED
+  SKIPPED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK - Smallest executable work unit
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Task {
+  id                  String   @id @default(cuid())
+  number              Int      @default(autoincrement())
+  
+  // Hierarchy
+  projectId           String
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId         String?
+  milestone           Milestone? @relation(fields: [milestoneId], references: [id])
+  parentId            String?
+  parent              Task?    @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks            Task[]   @relation("Subtasks")
+  
+  // Classification
+  title               String
+  description         String   @db.Text
+  type                TaskType
+  priority            TaskPriority @default(MEDIUM)
+  
+  // State Machine (Strict)
+  status              TaskStatus @default(QUEUED)
+  statusHistory       Json?    // Array of {status, timestamp, actor, reason}
+  
+  // Dependencies
+  dependencies        String[] // Array of task IDs that must complete first
+  dependents          String[] // Array of task IDs that depend on this
+  
+  // Assignment
+  requiredRole        String?  // Agent role required (e.g., "TRADING_LEAD")
+  assigneeId          String?
+  assignee            Agent?   @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  
+  // Execution
+  requiredTools       String[] // Tools needed (e.g., ["github", "aws", "discord"])
+  estimatedEffort     Float?   // Hours
+  actualEffort        Float?   // Hours spent
+  
+  // Timing
+  queuedAt            DateTime?
+  readyAt             DateTime?
+  assignedAt          DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  dueDate             DateTime?
+  
+  // Outputs & Validation
+  outputs             Json?    // Expected artifacts
+  validationCriteria  Json?    // Acceptance criteria
+  actualOutputs       Json?    // Produced artifacts
+  
+  // Retry & Escalation
+  retryCount          Int      @default(0)
+  maxRetries          Int      @default(3)
+  retryRules          Json?    // Retry policy
+  escalationPolicy    Json?    // When/how to escalate
+  
+  // Blocker Tracking
+  blockerType         BlockerType?
+  blockerReason       String?  @db.Text
+  blockerResolvedAt   DateTime?
+  
+  // Relations
+  comments            TaskComment[]
+  artifacts           Artifact[]
+  
+  // External Links
+  discordThreadUrl    String?
+  githubPrUrl         String?
+  
+  // Metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([projectId, status, priority])
+  @@index([assigneeId, status])
+  @@index([milestoneId, status])
+  @@index([status, blockerType])
+}
+
+enum TaskType {
+  FEATURE
+  BUG
+  TRADING_STRATEGY
+  INFRASTRUCTURE
+  SECURITY
+  RESEARCH
+  DOCUMENTATION
+  DEPLOYMENT
+  ANALYSIS
+  COORDINATION
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  QUEUED
+  READY
+  ASSIGNED
+  RUNNING
+  AWAITING_DEPENDENCY
+  AWAITING_VALIDATION
+  BLOCKED
+  FAILED
+  COMPLETE
+  CANCELED
+}
+
+enum BlockerType {
+  DEPENDENCY_UNMET
+  HUMAN_APPROVAL_PENDING
+  MISSING_CREDENTIALS
+  FAILING_TESTS
+  INFRA_UNAVAILABLE
+  AMBIGUOUS_REQUIREMENTS
+  RISK_THRESHOLD_EXCEEDED
+  EXTERNAL_DEPENDENCY
+}
+
+model TaskComment {
+  id          String @id @default(cuid())
+  taskId      String
+  task        Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  authorType  CommentAuthorType
+  authorId    String?  // Agent ID or User ID
+  authorName  String
+  content     String   @db.Text
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([taskId, createdAt])
+}
+
+enum CommentAuthorType {
+  AGENT
+  HUMAN
+  SYSTEM
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AGENT - Worker profile
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Agent {
+  id              String   @id @default(cuid())
+  handle          String   @unique // @claw-captain, @claw-trader, etc.
+  name            String
+  role            AgentRole
+  avatar          String?  // URL to avatar image
+  
+  // Configuration
+  model           String   // kimi-coding/k2p5, etc.
+  apiKeyRef       String   // Reference to secret, not the actual key
+  capabilities    String[] // Array of capability strings
+  
+  // Trust & Cost
+  trustLevel      Float    @default(0.5) // 0-1
+  costPerHour     Decimal? @db.Decimal(10, 2)
+  
+  // Current State
+  status          AgentStatus @default(OFFLINE)
+  currentLoad     Int      @default(0) // Number of active tasks
+  maxLoad         Int      @default(3) // Max concurrent tasks
+  
+  // Relations
+  assignedTasks   Task[]   @relation("AssignedTasks")
+  activities      AgentActivity[]
+  heartbeats      AgentHeartbeat[]
+  
+  // Trading-specific
+  tradingConfig   TradingConfig?
+  
+  // Performance History
+  performanceStats Json?   // Success rate, avg task time, etc.
+  
+  // Metadata
+  lastSeenAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([status])
+  @@index([role])
+  @@index([handle])
+}
+
+enum AgentRole {
+  COORDINATOR
+  TRADING_LEAD
+  FULLSTACK_DEV
+  INFRASTRUCTURE
+  SECURITY_QA
+  CUSTOM
+}
+
+enum AgentStatus {
+  ONLINE
+  BUSY
+  AWAY
+  OFFLINE
+  ERROR
+}
+
+model AgentHeartbeat {
+  id                String   @id @default(cuid())
+  agentId           String
+  agent             Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  timestamp         DateTime @default(now())
+  cpuUsage          Float?   // 0-100
+  memoryUsage       Float?   // MB
+  activeTaskCount   Int      @default(0)
+  
+  metadata          Json?    // Flexible extra data
+  
+  @@index([agentId, timestamp])
+}
+
+model AgentActivity {
+  id          String   @id @default(cuid())
+  agentId     String
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  type        ActivityType
+  description String
+  taskId      String?
+  projectId   String?
+  metadata    Json?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([agentId, createdAt])
+  @@index([type])
+  @@index([projectId])
+}
+
+enum ActivityType {
+  TASK_CREATED
+  TASK_ASSIGNED
+  TASK_STARTED
+  TASK_COMPLETED
+  TASK_BLOCKED
+  TASK_FAILED
+  TASK_RETRY
+  CODE_PUSHED
+  PR_OPENED
+  PR_MERGED
+  DEPLOYMENT_STARTED
+  DEPLOYMENT_COMPLETED
+  TRADE_EXECUTED
+  TRADE_CLOSED
+  ALERT_TRIGGERED
+  MESSAGE_SENT
+  ERROR_OCCURRED
+  DECISION_MADE
+  ESCALATION_TRIGGERED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRADING - Specialized configuration for trading agents
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TradingConfig {
+  id          String @id @default(cuid())
+  agentId     String @unique
+  agent       Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Risk limits
+  maxPositionSize     Decimal? @db.Decimal(16, 8)
+  maxDailyLoss        Decimal? @db.Decimal(10, 2)
+  maxDrawdown         Float?   // Percentage
+  maxOrdersPerMinute  Int      @default(10)
+  maxOpenPositions    Int      @default(5)
+  
+  // Trading permissions
+  canTradeLive        Boolean @default(false)
+  canTradePaper       Boolean @default(true)
+  allowedExchanges    String[]
+  allowedPairs        String[] // BTC/USDT, ETH/USDT, etc.
+  
+  // Safety
+  killSwitchEnabled   Boolean @default(false)
+  lastKillSwitchAt    DateTime?
+  
+  updatedAt           DateTime @updatedAt
+}
+
+model Position {
+  id            String @id @default(cuid())
+  
+  agentId       String
+  projectId     String?
+  exchange      String
+  symbol        String // BTC/USDT
+  side          PositionSide
+  
+  entryPrice    Decimal @db.Decimal(16, 8)
+  size          Decimal @db.Decimal(16, 8)
+  leverage      Int     @default(1)
+  
+  unrealizedPnl Decimal? @db.Decimal(16, 8)
+  realizedPnl   Decimal? @db.Decimal(16, 8)
+  
+  status        PositionStatus @default(OPEN)
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+  
+  // Relations
+  orders        Order[]
+  
+  @@index([agentId, status])
+  @@index([symbol, status])
+  @@index([projectId])
+}
+
+enum PositionSide {
+  LONG
+  SHORT
+}
+
+enum PositionStatus {
+  OPEN
+  CLOSED
+  LIQUIDATED
+}
+
+model Order {
+  id          String @id @default(cuid())
+  
+  positionId  String?
+  position    Position? @relation(fields: [positionId], references: [id])
+  
+  agentId     String
+  projectId   String?
+  exchange    String
+  symbol      String
+  
+  side        OrderSide
+  type        OrderType
+  status      OrderStatus @default(PENDING)
+  
+  size        Decimal @db.Decimal(16, 8)
+  price       Decimal? @db.Decimal(16, 8) // Null for market orders
+  
+  // Execution
+  executedSize  Decimal? @db.Decimal(16, 8)
+  executedPrice Decimal? @db.Decimal(16, 8)
+  
+  // Metadata
+  strategyId    String? // Link to strategy that generated this
+  taskId        String? // Link to originating task
+  metadata      Json?   // Strategy-specific data
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([agentId, status])
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP_LOSS
+  TAKE_PROFIT
+}
+
+enum OrderStatus {
+  PENDING
+  OPEN
+  FILLED
+  PARTIALLY_FILLED
+  CANCELLED
+  REJECTED
+  EXPIRED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DECISION - Explicit recorded judgments
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Decision {
+  id            String @id @default(cuid())
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String @db.Text
+  rationale     String @db.Text
+  
+  authorType    CommentAuthorType
+  authorId      String?
+  authorName    String
+  
+  // Approvals
+  requiredApprovals Int @default(0)
+  currentApprovals  Int @default(0)
+  approvals     Json? // Array of {approver, timestamp, comment}
+  
+  // State
+  state         DecisionState @default(PROPOSED)
+  
+  // Related items
+  relatedTaskIds String[]
+  
+  createdAt     DateTime @default(now())
+  resolvedAt    DateTime?
+  
+  @@index([projectId, state])
+  @@index([state])
+}
+
+enum DecisionState {
+  PROPOSED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RISK - Tracked threats
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Risk {
+  id            String @id @default(cuid())
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String @db.Text
+  
+  // Risk assessment
+  likelihood    RiskLevel
+  impact        RiskLevel
+  score         Int      // Calculated: likelihood * impact
+  
+  // Mitigation
+  mitigation    String?  @db.Text
+  owner         String?  // Agent or human responsible
+  
+  // State
+  status        RiskStatus @default(IDENTIFIED)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([projectId, status])
+  @@index([score])
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RiskStatus {
+  IDENTIFIED
+  ASSESSING
+  MITIGATING
+  ACCEPTED
+  RESOLVED
+  REALIZED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARTIFACT - Outputs produced by tasks
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Artifact {
+  id            String @id @default(cuid())
+  
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId        String?
+  task          Task?   @relation(fields: [taskId], references: [id])
+  
+  type          ArtifactType
+  name          String
+  description   String? @db.Text
+  url           String
+  
+  // For code artifacts
+  githubRepo    String?
+  githubPr      String?
+  githubCommit  String?
+  
+  // For deployed artifacts
+  environment   String? // staging, production
+  version       String?
+  
+  // Validation
+  validated     Boolean @default(false)
+  validatedAt   DateTime?
+  validatedBy   String?
+  
+  metadata      Json?   // Flexible metadata
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([projectId, type])
+  @@index([taskId])
+  @@index([createdAt])
+}
+
+enum ArtifactType {
+  SPECIFICATION
+  DESIGN
+  CODE
+  PR
+  DEPLOYMENT
+  TEST_RESULT
+  DOCUMENTATION
+  REPORT
+  DATA_EXPORT
+  DECISION_RECORD
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT - Immutable action log
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id            String @id @default(cuid())
+  
+  timestamp     DateTime @default(now())
+  actorType     ActorType
+  actorId       String?  // Agent ID or User ID
+  actorName     String
+  
+  action        String   // What happened
+  resourceType  String   // Task, Project, Position, etc.
+  resourceId    String?
+  
+  beforeState   Json?    // Previous state
+  afterState    Json?    // New state
+  
+  ipAddress     String?
+  userAgent     String?
+  
+  severity      AuditSeverity @default(INFO)
+  
+  @@index([timestamp])
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+  @@index([severity])
+}
+
+enum ActorType {
+  AGENT
+  HUMAN
+  SYSTEM
+  WEBHOOK
+}
+
+enum AuditSeverity {
+  DEBUG
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM - Configuration and operational state
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SystemConfig {
+  id          String @id @default(cuid())
+  key         String @unique
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+model Webhook {
+  id          String @id @default(cuid())
+  
+  name        String
+  url         String
+  secret      String   // For signature verification
+  
+  eventTypes  String[] // Which events to send
+  
+  isActive    Boolean @default(true)
+  lastUsedAt  DateTime?
+  failCount   Int @default(0)
+  
+  createdAt   DateTime @default(now())
+}
+
+// Event store for event sourcing pattern
+model Event {
+  id            String   @id @default(cuid())
+  
+  type          String   // Event type
+  aggregateType String   // Project, Task, etc.
+  aggregateId   String   // ID of the aggregate
+  
+  payload       Json     // Event data
+  metadata      Json?    // Correlation ID, causation ID, etc.
+  
+  actorType     ActorType
+  actorId       String?
+  
+  timestamp     DateTime @default(now())
+  
+  @@index([aggregateType, aggregateId])
+  @@index([type])
+  @@index([timestamp])
+}
