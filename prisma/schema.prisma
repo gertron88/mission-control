@@ -1,8 +1,9 @@
-// Mission Control - Autonomous Project Operations Layer
-// Database Schema v2.0
+// Mission Control - Improved Database Schema
+// Version 2.1 - Added performance indexes, soft deletes, and enhanced tracking
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
 }
 
 datasource db {
@@ -17,12 +18,14 @@ datasource db {
 model Portfolio {
   id              String   @id @default(cuid())
   name            String
+  slug            String   @unique  // URL-friendly name
   description     String?  @db.Text
   
   // Strategy & Constraints
   strategy        String?  @db.Text
-  budgetTotal     Decimal? @db.Decimal(10, 2)
-  budgetUsed      Decimal  @default(0) @db.Decimal(10, 2)
+  budgetTotal     Decimal? @db.Decimal(12, 2)
+  budgetUsed      Decimal  @default(0) @db.Decimal(12, 2)
+  currency        String   @default("USD")
   priorities      Json?    // Priority scoring rules
   capacityRules   Json?    // Agent capacity allocation rules
   
@@ -31,10 +34,14 @@ model Portfolio {
   
   // Metadata
   isActive        Boolean  @default(true)
+  isArchived      Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  createdBy       String?  // User/agent who created
   
   @@index([isActive])
+  @@index([slug])
+  @@map("portfolios")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +55,7 @@ model Project {
   
   // Identity
   name            String
+  slug            String   @unique
   charter         String?  @db.Text
   description     String?  @db.Text
   
@@ -57,7 +65,7 @@ model Project {
   
   // State Management
   state           ProjectState @default(PROPOSED)
-  stateHistory    Json?    // Array of {state, timestamp, reason}
+  stateHistory    Json?    // Array of {state, timestamp, reason, actor}
   
   // Planning
   milestoneGraph  Json?    // DAG of milestones
@@ -67,8 +75,10 @@ model Project {
   actualEnd       DateTime?
   
   // Budget & Resources
-  budgetAllocated Decimal? @db.Decimal(10, 2)
-  budgetSpent     Decimal  @default(0) @db.Decimal(10, 2)
+  budgetAllocated Decimal? @db.Decimal(12, 2)
+  budgetSpent     Decimal  @default(0) @db.Decimal(12, 2)
+  effortEstimated Float?   // Person-hours
+  effortActual    Float?   // Person-hours
   
   // Relations
   milestones      Milestone[]
@@ -81,11 +91,16 @@ model Project {
   memory          Json?    // Persistent project knowledge
   
   // Metadata
+  isArchived      Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  createdBy       String?
   
-  @@index([portfolioId, state])
+  @@index([portfolioId, state, isArchived])
   @@index([state])
+  @@index([slug])
+  @@index([plannedEnd])  // For deadline tracking
+  @@map("projects")
 }
 
 enum ProjectState {
@@ -114,6 +129,7 @@ model Milestone {
   
   name            String
   description     String?  @db.Text
+  slug            String
   
   // Sequencing
   sequence        Int
@@ -126,6 +142,9 @@ model Milestone {
   plannedDate     DateTime?
   actualDate      DateTime?
   
+  // Completion criteria
+  acceptanceCriteria Json?  // What defines completion
+  
   // Relations
   tasks           Task[]
   
@@ -133,8 +152,11 @@ model Milestone {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
+  @@unique([projectId, slug])
   @@index([projectId, state])
   @@index([state])
+  @@index([plannedDate])
+  @@map("milestones")
 }
 
 enum MilestoneState {
@@ -167,10 +189,11 @@ model Task {
   description         String   @db.Text
   type                TaskType
   priority            TaskPriority @default(MEDIUM)
+  tags                String[] // For filtering and categorization
   
   // State Machine (Strict)
   status              TaskStatus @default(QUEUED)
-  statusHistory       Json?    // Array of {status, timestamp, actor, reason}
+  statusHistory       Json?    // Array of {status, timestamp, actor, reason, metadata}
   
   // Dependencies
   dependencies        String[] // Array of task IDs that must complete first
@@ -194,6 +217,9 @@ model Task {
   completedAt         DateTime?
   dueDate             DateTime?
   
+  // Time tracking
+  timeLogs            TimeLog[] // Detailed time entries
+  
   // Outputs & Validation
   outputs             Json?    // Expected artifacts
   validationCriteria  Json?    // Acceptance criteria
@@ -209,23 +235,34 @@ model Task {
   blockerType         BlockerType?
   blockerReason       String?  @db.Text
   blockerResolvedAt   DateTime?
+  blockerResolution   String?  @db.Text  // How it was resolved
   
   // Relations
   comments            TaskComment[]
-  artifacts           Artifact[]
+  attachments         Attachment[]
   
   // External Links
   discordThreadUrl    String?
   githubPrUrl         String?
+  githubIssueUrl      String?
+  
+  // Soft delete
+  deletedAt           DateTime?
+  isDeleted           Boolean  @default(false)
   
   // Metadata
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  createdBy           String?
   
   @@index([projectId, status, priority])
   @@index([assigneeId, status])
   @@index([milestoneId, status])
   @@index([status, blockerType])
+  @@index([dueDate])  // For deadline alerts
+  @@index([isDeleted])
+  @@index([type, status])  // For workload balancing
+  @@map("tasks")
 }
 
 enum TaskType {
@@ -239,6 +276,8 @@ enum TaskType {
   DEPLOYMENT
   ANALYSIS
   COORDINATION
+  TESTING
+  CODE_REVIEW
 }
 
 enum TaskPriority {
@@ -270,6 +309,27 @@ enum BlockerType {
   AMBIGUOUS_REQUIREMENTS
   RISK_THRESHOLD_EXCEEDED
   EXTERNAL_DEPENDENCY
+  RESOURCE_UNAVAILABLE
+}
+
+// Time tracking for detailed effort analysis
+model TimeLog {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  agentId     String
+  startedAt   DateTime
+  endedAt     DateTime?
+  duration    Float?   // Hours
+  
+  description String?  // What was done
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([taskId, startedAt])
+  @@index([agentId])
+  @@map("time_logs")
 }
 
 model TaskComment {
@@ -282,15 +342,41 @@ model TaskComment {
   authorName  String
   content     String   @db.Text
   
+  // For threaded comments
+  parentId    String?
+  
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   
   @@index([taskId, createdAt])
+  @@map("task_comments")
 }
 
 enum CommentAuthorType {
   AGENT
   HUMAN
   SYSTEM
+}
+
+model Attachment {
+  id          String @id @default(cuid())
+  taskId      String
+  task        Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  name        String
+  filename    String
+  url         String
+  mimeType    String
+  size        Int      // bytes
+  
+  // Storage info
+  storageProvider String @default("s3")  // s3, gcs, azure, etc.
+  storageKey      String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([taskId])
+  @@map("attachments")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -306,7 +392,8 @@ model Agent {
   
   // Configuration
   model           String   // kimi-coding/k2p5, etc.
-  apiKeyRef       String   // Reference to secret, not the actual key
+  apiKeyRef       String   @unique  // Reference to secret, not the actual key
+  apiKeyHash      String?  // For validation (bcrypt)
   capabilities    String[] // Array of capability strings
   
   // Trust & Cost
@@ -322,6 +409,7 @@ model Agent {
   assignedTasks   Task[]   @relation("AssignedTasks")
   activities      AgentActivity[]
   heartbeats      AgentHeartbeat[]
+  timeLogs        TimeLog[]
   
   // Trading-specific
   tradingConfig   TradingConfig?
@@ -329,14 +417,23 @@ model Agent {
   // Performance History
   performanceStats Json?   // Success rate, avg task time, etc.
   
+  // Usage limits
+  dailyTaskLimit  Int      @default(10)
+  tasksToday      Int      @default(0)
+  lastTaskDate    DateTime?
+  
   // Metadata
   lastSeenAt      DateTime?
+  lastIpAddress   String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  isActive        Boolean  @default(true)
   
   @@index([status])
   @@index([role])
   @@index([handle])
+  @@index([apiKeyRef])
+  @@map("agents")
 }
 
 enum AgentRole {
@@ -345,6 +442,7 @@ enum AgentRole {
   FULLSTACK_DEV
   INFRASTRUCTURE
   SECURITY_QA
+  RESEARCHER
   CUSTOM
 }
 
@@ -354,6 +452,7 @@ enum AgentStatus {
   AWAY
   OFFLINE
   ERROR
+  DISABLED
 }
 
 model AgentHeartbeat {
@@ -366,9 +465,14 @@ model AgentHeartbeat {
   memoryUsage       Float?   // MB
   activeTaskCount   Int      @default(0)
   
+  // Extended metrics
+  networkLatency    Float?   // ms to Mission Control
+  diskUsage         Float?   // Percentage
+  
   metadata          Json?    // Flexible extra data
   
   @@index([agentId, timestamp])
+  @@map("agent_heartbeats")
 }
 
 model AgentActivity {
@@ -382,11 +486,17 @@ model AgentActivity {
   projectId   String?
   metadata    Json?
   
+  // Performance tracking
+  durationMs  Int?     // How long the activity took
+  success     Boolean? // Whether it succeeded
+  
   createdAt   DateTime @default(now())
   
   @@index([agentId, createdAt])
   @@index([type])
   @@index([projectId])
+  @@index([createdAt])  // For activity feeds
+  @@map("agent_activities")
 }
 
 enum ActivityType {
@@ -400,15 +510,19 @@ enum ActivityType {
   CODE_PUSHED
   PR_OPENED
   PR_MERGED
+  PR_REVIEWED
   DEPLOYMENT_STARTED
   DEPLOYMENT_COMPLETED
+  DEPLOYMENT_FAILED
   TRADE_EXECUTED
   TRADE_CLOSED
+  TRADE_FAILED
   ALERT_TRIGGERED
   MESSAGE_SENT
   ERROR_OCCURRED
   DECISION_MADE
   ESCALATION_TRIGGERED
+  BLOCKER_RESOLVED
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -426,18 +540,28 @@ model TradingConfig {
   maxDrawdown         Float?   // Percentage
   maxOrdersPerMinute  Int      @default(10)
   maxOpenPositions    Int      @default(5)
+  maxLeverage         Int      @default(3)
   
   // Trading permissions
   canTradeLive        Boolean @default(false)
   canTradePaper       Boolean @default(true)
   allowedExchanges    String[]
   allowedPairs        String[] // BTC/USDT, ETH/USDT, etc.
+  restrictedHours     Json?    // Times when trading not allowed
   
   // Safety
   killSwitchEnabled   Boolean @default(false)
   lastKillSwitchAt    DateTime?
+  killSwitchReason    String?
+  
+  // Circuit breakers
+  dailyLossLimit      Decimal? @db.Decimal(10, 2)
+  dailyLossCurrent    Decimal  @default(0) @db.Decimal(10, 2)
+  lastResetDate       DateTime @default(now())
   
   updatedAt           DateTime @updatedAt
+  
+  @@map("trading_configs")
 }
 
 model Position {
@@ -453,12 +577,22 @@ model Position {
   size          Decimal @db.Decimal(16, 8)
   leverage      Int     @default(1)
   
+  // P&L tracking
   unrealizedPnl Decimal? @db.Decimal(16, 8)
   realizedPnl   Decimal? @db.Decimal(16, 8)
+  pnlPercent    Float?   // Percentage
+  
+  // Risk
+  stopLoss      Decimal? @db.Decimal(16, 8)
+  takeProfit    Decimal? @db.Decimal(16, 8)
   
   status        PositionStatus @default(OPEN)
   openedAt      DateTime @default(now())
   closedAt      DateTime?
+  
+  // Strategy tracking
+  strategyId    String?
+  taskId        String?
   
   // Relations
   orders        Order[]
@@ -466,6 +600,8 @@ model Position {
   @@index([agentId, status])
   @@index([symbol, status])
   @@index([projectId])
+  @@index([openedAt])  // For P&L calculations
+  @@map("positions")
 }
 
 enum PositionSide {
@@ -477,6 +613,8 @@ enum PositionStatus {
   OPEN
   CLOSED
   LIQUIDATED
+  STOPPED
+  EXPIRED
 }
 
 model Order {
@@ -489,6 +627,7 @@ model Order {
   projectId   String?
   exchange    String
   symbol      String
+  externalId  String?  // Exchange's order ID
   
   side        OrderSide
   type        OrderType
@@ -500,11 +639,16 @@ model Order {
   // Execution
   executedSize  Decimal? @db.Decimal(16, 8)
   executedPrice Decimal? @db.Decimal(16, 8)
+  fees          Decimal? @db.Decimal(16, 8)
   
   // Metadata
   strategyId    String? // Link to strategy that generated this
   taskId        String? // Link to originating task
   metadata      Json?   // Strategy-specific data
+  
+  // Error tracking
+  errorMessage  String?
+  retryCount    Int     @default(0)
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -512,6 +656,8 @@ model Order {
   @@index([agentId, status])
   @@index([projectId])
   @@index([createdAt])
+  @@index([exchange, externalId])
+  @@map("orders")
 }
 
 enum OrderSide {
@@ -524,16 +670,20 @@ enum OrderType {
   LIMIT
   STOP_LOSS
   TAKE_PROFIT
+  STOP_LOSS_LIMIT
+  TAKE_PROFIT_LIMIT
+  TRAILING_STOP
 }
 
 enum OrderStatus {
   PENDING
   OPEN
-  FILLED
   PARTIALLY_FILLED
+  FILLED
   CANCELLED
   REJECTED
   EXPIRED
+  FAILED
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -563,12 +713,15 @@ model Decision {
   
   // Related items
   relatedTaskIds String[]
+  tags          String[]
   
   createdAt     DateTime @default(now())
   resolvedAt    DateTime?
   
   @@index([projectId, state])
   @@index([state])
+  @@index([createdAt])
+  @@map("decisions")
 }
 
 enum DecisionState {
@@ -577,6 +730,7 @@ enum DecisionState {
   APPROVED
   REJECTED
   SUPERSEDED
+  IMPLEMENTED
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -590,6 +744,7 @@ model Risk {
   
   title         String
   description   String @db.Text
+  category      RiskCategory @default(TECHNICAL)
   
   // Risk assessment
   likelihood    RiskLevel
@@ -598,16 +753,33 @@ model Risk {
   
   // Mitigation
   mitigation    String?  @db.Text
+  contingency   String?  @db.Text  // Plan B if risk materializes
   owner         String?  // Agent or human responsible
   
   // State
   status        RiskStatus @default(IDENTIFIED)
+  
+  // Tracking
+  identifiedAt  DateTime @default(now())
+  resolvedAt    DateTime?
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
   @@index([projectId, status])
   @@index([score])
+  @@index([category])
+  @@map("risks")
+}
+
+enum RiskCategory {
+  TECHNICAL
+  SCHEDULE
+  BUDGET
+  SECURITY
+  LEGAL
+  EXTERNAL
+  OPERATIONAL
 }
 
 enum RiskLevel {
@@ -621,9 +793,10 @@ enum RiskStatus {
   IDENTIFIED
   ASSESSING
   MITIGATING
+  MONITORING
   ACCEPTED
   RESOLVED
-  REALIZED
+  REALIZED  // Actually happened
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -652,18 +825,26 @@ model Artifact {
   environment   String? // staging, production
   version       String?
   
+  // For file artifacts
+  fileSize      Int?
+  mimeType      String?
+  
   // Validation
   validated     Boolean @default(false)
   validatedAt   DateTime?
   validatedBy   String?
+  validationResult Json?  // Test results, scan reports, etc.
   
   metadata      Json?   // Flexible metadata
   
   createdAt     DateTime @default(now())
+  createdBy     String?
   
   @@index([projectId, type])
   @@index([taskId])
   @@index([createdAt])
+  @@index([type, validated])  // For finding unvalidated artifacts
+  @@map("artifacts")
 }
 
 enum ArtifactType {
@@ -677,6 +858,7 @@ enum ArtifactType {
   REPORT
   DATA_EXPORT
   DECISION_RECORD
+  CONFIGURATION
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -698,15 +880,23 @@ model AuditLog {
   beforeState   Json?    // Previous state
   afterState    Json?    // New state
   
+  // Request context
   ipAddress     String?
   userAgent     String?
+  requestId     String?  // For tracing
   
   severity      AuditSeverity @default(INFO)
+  
+  // Soft delete protection
+  isDeleted     Boolean @default(false)
   
   @@index([timestamp])
   @@index([actorId])
   @@index([resourceType, resourceId])
   @@index([severity])
+  @@index([action])
+  @@index([timestamp, actorId])  // For user activity
+  @@map("audit_logs")
 }
 
 enum ActorType {
@@ -714,6 +904,7 @@ enum ActorType {
   HUMAN
   SYSTEM
   WEBHOOK
+  SCHEDULER
 }
 
 enum AuditSeverity {
@@ -722,6 +913,7 @@ enum AuditSeverity {
   WARNING
   ERROR
   CRITICAL
+  SECURITY
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -733,8 +925,13 @@ model SystemConfig {
   key         String @unique
   value       Json
   description String?
+  category    String @default("general")  // general, trading, security, etc.
+  isSecret    Boolean @default(false)     // Mask in UI/logs
   updatedAt   DateTime @updatedAt
   updatedBy   String?
+  
+  @@index([category])
+  @@map("system_config")
 }
 
 model Webhook {
@@ -746,11 +943,20 @@ model Webhook {
   
   eventTypes  String[] // Which events to send
   
+  // Status
   isActive    Boolean @default(true)
   lastUsedAt  DateTime?
+  lastError   String?
   failCount   Int @default(0)
+  successCount Int @default(0)
+  
+  // Retry config
+  maxRetries  Int @default(3)
   
   createdAt   DateTime @default(now())
+  
+  @@index([isActive])
+  @@map("webhooks")
 }
 
 // Event store for event sourcing pattern
@@ -767,9 +973,58 @@ model Event {
   actorType     ActorType
   actorId       String?
   
+  // Versioning for optimistic concurrency
+  version       Int      @default(1)
+  
   timestamp     DateTime @default(now())
   
   @@index([aggregateType, aggregateId])
   @@index([type])
   @@index([timestamp])
+  @@index([aggregateType, timestamp])  // For replay
+  @@map("events")
+}
+
+// Health checks and system monitoring
+model HealthCheck {
+  id            String   @id @default(cuid())
+  
+  service       String   // api, database, discord, etc.
+  status        String   // healthy, degraded, down
+  responseTime  Int?     // ms
+  message       String?
+  details       Json?
+  
+  checkedAt     DateTime @default(now())
+  
+  @@index([service, checkedAt])
+  @@index([status])
+  @@map("health_checks")
+}
+
+// Notifications to agents/humans
+model Notification {
+  id            String   @id @default(cuid())
+  
+  recipientType String   // AGENT, HUMAN, CHANNEL
+  recipientId   String   // agent ID, user ID, or channel name
+  
+  type          String   // TASK_ASSIGNED, BLOCKER, KILL_SWITCH, etc.
+  title         String
+  message       String   @db.Text
+  
+  // Delivery
+  channel       String   // discord, email, in_app, etc.
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  
+  // Related entities
+  taskId        String?
+  projectId     String?
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([recipientId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
 }
