@@ -1,0 +1,40 @@
+{
+  "name": "@mission-control/sdk",
+  "version": "1.0.0",
+  "description": "Agent SDK for Mission Control - Autonomous AI agent orchestration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "orchestration",
+    "automation",
+    "trading",
+    "mission-control"
+  ],
+  "author": "Gertron88",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "events": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/events": "^3.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  }
+}

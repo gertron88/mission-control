@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logAction } from '@/lib/audit'
+import { createRouteHandler } from '@/lib/auth'
 import { sendToDiscord, createTaskEmbed } from '@/lib/discord'
 import { ActorType, TaskStatus, AuditSeverity } from '@prisma/client'
 import { z } from 'zod'
@@ -17,7 +18,7 @@ const createTaskSchema = z.object({
   parentId: z.string().optional(),
 })
 
-// GET /api/tasks - List tasks
+// GET /api/tasks - List tasks (public read, protected write)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   
@@ -46,14 +47,15 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(tasks)
 }
 
-// POST /api/tasks - Create task
-export async function POST(request: NextRequest) {
+// POST /api/tasks - Create task (protected)
+async function createTaskHandler(request: NextRequest) {
   try {
     const body = await request.json()
     const data = createTaskSchema.parse(body)
     
-    // Get creator from auth context (simplified)
-    const creatorId = body.creatorId || 'system'
+    // Get creator from authenticated agent or user
+    const actor = (request as any).agent || (request as any).user
+    const creatorId = actor?.id || 'system'
     
     const task = await prisma.task.create({
       data: {
@@ -102,3 +104,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
   }
 }
+
+export const POST = createRouteHandler(createTaskHandler, {
+  allowAgent: true,
+  allowHuman: true,
+  rateLimitMax: 100
+})
