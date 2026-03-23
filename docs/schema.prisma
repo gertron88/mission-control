@@ -1,0 +1,514 @@
+# Mission Control - Autonomous Agent Orchestration Platform
+
+## Executive Summary
+
+A purpose-built mission control for coordinating 5+ autonomous AI agents working on trading bots and full-stack applications. Built with Next.js, deployed on Vercel, with real-time agent status, task orchestration, and trading-specific controls.
+
+---
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           MISSION CONTROL (Next.js + Vercel)                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                        FRONTEND (React + Tailwind)                     │  │
+│  ├───────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                        │  │
+│  │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │  │
+│  │   │   DASHBOARD │  │ TASK BOARD  │  │  AGENTS     │  │  TRADING    │  │  │
+│  │   │             │  │             │  │             │  │             │  │  │
+│  │   │ • Overview  │  │ • Kanban    │  │ • Status    │  │ • Positions │  │  │
+│  │   │ • Alerts    │  │ • Timeline  │  │ • Activity  │  │ • Orders    │  │  │
+│  │   │ • Metrics   │  │ • Calendar  │  │ • Logs      │  │ • P&L       │  │  │
+│  │   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │  │
+│  │                                                                        │  │
+│  │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │  │
+│  │   │   AUDIT     │  │   SETTINGS  │  │   KILL      │  │  ANALYTICS  │  │  │
+│  │   │             │  │             │  │  SWITCHES   │  │             │  │  │
+│  │   │ • Action Log│  │ • Agents    │  │             │  │ • Performance│  │  │
+│  │   │ • Decisions │  │ • Integrations│ • Emergency │  │ • Costs     │  │  │
+│  │   │ • Trades    │  │ • Policies  │  │ • Pause All │  │ • Trends    │  │  │
+│  │   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  │  │
+│  │                                                                        │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    │                                         │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                     REAL-TIME LAYER (WebSocket/SSE)                    │  │
+│  │              Server-Sent Events for live agent updates                 │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    │                                         │
+└────────────────────────────────────┼─────────────────────────────────────────┘
+                                     │
+┌────────────────────────────────────┼─────────────────────────────────────────┐
+│                     BACKEND API (Next.js API Routes)                         │
+├────────────────────────────────────┼─────────────────────────────────────────┤
+│                                    │                                         │
+│  ┌─────────────────────────────────▼─────────────────────────────────────┐   │
+│  │                         CORE SERVICES                                  │   │
+│  ├───────────────────────────────────────────────────────────────────────┤   │
+│  │                                                                        │   │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐              │   │
+│  │  │  Task Service │  │ Agent Service │  │ Event Service │              │   │
+│  │  │               │  │               │  │               │              │   │
+│  │  │ • CRUD        │  │ • Registry    │  │ • Broadcast   │              │   │
+│  │  │ • Assignment  │  │ • Heartbeat   │  │ • Webhooks    │              │   │
+│  │  │ • Scheduling  │  │ • Status      │  │ • Discord     │              │   │
+│  │  │ • Dependencies│  │ • Capability  │  │   Integration │              │   │
+│  │  └───────────────┘  └───────────────┘  └───────────────┘              │   │
+│  │                                                                        │   │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐              │   │
+│  │  │ Policy Engine │  │ Audit Service │  │ Trading Svc   │              │   │
+│  │  │               │  │               │  │               │              │   │
+│  │  │ • Permissions │  │ • Logging     │  │ • Positions   │              │   │
+│  │  │ • Rate Limits │  │ • Compliance  │  │ • Risk Checks │              │   │
+│  │  │ • Approvals   │  │ • Search      │  │ • Order Flow  │              │   │
+│  │  └───────────────┘  └───────────────┘  └───────────────┘              │   │
+│  │                                                                        │   │
+│  └───────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│  ┌─────────────────────────────────▼─────────────────────────────────────┐   │
+│  │                      DATA LAYER (Prisma + PostgreSQL)                  │   │
+│  │                   Hosted on Supabase or Neon/Railway                   │   │
+│  └───────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                     │
+          ┌──────────────────────────┼──────────────────────────┐
+          │                          │                          │
+          ▼                          ▼                          ▼
+┌─────────────────┐        ┌─────────────────┐        ┌─────────────────┐
+│   DISCORD       │        │   GITHUB        │        │   EXCHANGES     │
+│   (Chat Bus)    │        │   (Code/PRs)    │        │   (Trading)     │
+├─────────────────┤        ├─────────────────┤        ├─────────────────┤
+│ • Agent msgs    │        │ • Repos         │        │ • Binance       │
+│ • Commands      │        │ • PRs           │        │ • Coinbase      │
+│ • Notifications │        │ • Actions       │        │ • Bybit         │
+│ • Threads       │        │ • Issues        │        │ • Webhooks      │
+└─────────────────┘        └─────────────────┘        └─────────────────┘
+```
+
+---
+
+## Database Schema (Prisma)
+
+```prisma
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AGENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Agent {
+  id          String   @id @default(cuid())
+  handle      String   @unique // @claw-captain, @claw-trader, etc.
+  name        String
+  role        AgentRole
+  avatar      String?  // URL to avatar image
+  status      AgentStatus @default(OFFLINE)
+  
+  // Configuration
+  model       String   // kimi-coding/k2p5, etc.
+  apiKeyRef   String   // Reference to secret, not the actual key
+  capabilities String[] // Array of capability strings
+  
+  // Relationships
+  assignedTasks Task[] @relation("AssignedTasks")
+  createdTasks  Task[] @relation("CreatedTasks")
+  activities    AgentActivity[]
+  heartbeats    AgentHeartbeat[]
+  
+  // Trading-specific
+  tradingConfig TradingConfig?
+  
+  // Metadata
+  lastSeenAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([status])
+  @@index([handle])
+}
+
+enum AgentRole {
+  COORDINATOR
+  TRADING_LEAD
+  FULLSTACK_DEV
+  INFRASTRUCTURE
+  SECURITY_QA
+  CUSTOM
+}
+
+enum AgentStatus {
+  ONLINE
+  BUSY
+  AWAY
+  OFFLINE
+  ERROR
+}
+
+model AgentHeartbeat {
+  id        String   @id @default(cuid())
+  agentId   String
+  agent     Agent    @relation(fields: [agentId], references: [id])
+  
+  timestamp DateTime @default(now())
+  cpuUsage  Float?   // 0-100
+  memoryUsage Float? // MB
+  activeTaskCount Int @default(0)
+  
+  metadata  Json?    // Flexible extra data
+  
+  @@index([agentId, timestamp])
+}
+
+model AgentActivity {
+  id          String   @id @default(cuid())
+  agentId     String
+  agent       Agent    @relation(fields: [agentId], references: [id])
+  
+  type        ActivityType
+  description String
+  metadata    Json?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([agentId, createdAt])
+  @@index([type])
+}
+
+enum ActivityType {
+  TASK_CREATED
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_BLOCKED
+  CODE_PUSHED
+  PR_OPENED
+  PR_MERGED
+  DEPLOYMENT
+  TRADE_EXECUTED
+  TRADE_CLOSED
+  ALERT_TRIGGERED
+  MESSAGE_SENT
+  ERROR_OCCURRED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASKS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Task {
+  id          String   @id @default(cuid())
+  number      Int      @default(autoincrement()) // Human-readable: TASK-#42
+  
+  title       String
+  description String   @db.Text
+  
+  // Status workflow
+  status      TaskStatus @default(BACKLOG)
+  priority    TaskPriority @default(MEDIUM)
+  
+  // Assignment
+  assigneeId  String?
+  assignee    Agent?   @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  creatorId   String
+  creator     Agent    @relation("CreatedTasks", fields: [creatorId], references: [id])
+  
+  // Categorization
+  type        TaskType
+  project     String?  // Project identifier
+  tags        String[]
+  
+  // Scheduling
+  dueDate     DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  estimatedHours Float?
+  actualHours Float?
+  
+  // Relations
+  dependencies Task[]   @relation("TaskDependencies")
+  dependents   Task[]   @relation("TaskDependencies")
+  parentId     String?
+  parent       Task?    @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks     Task[]   @relation("Subtasks")
+  
+  comments     TaskComment[]
+  attachments  Attachment[]
+  
+  // External links
+  discordThreadUrl String?
+  githubPrUrl      String?
+  trelloCardUrl    String? // If syncing with Trello
+  
+  // Audit
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([status, priority])
+  @@index([assigneeId, status])
+  @@index([project])
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  BLOCKED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskType {
+  FEATURE
+  BUG
+  TRADING_STRATEGY
+  INFRASTRUCTURE
+  SECURITY
+  RESEARCH
+  DOCUMENTATION
+  DEPLOYMENT
+}
+
+model TaskComment {
+  id      String @id @default(cuid())
+  taskId  String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  authorType CommentAuthorType
+  authorId   String?  // Agent ID if agent
+  authorName String   // Display name
+  content    String   @db.Text
+  
+  createdAt  DateTime @default(now())
+}
+
+enum CommentAuthorType {
+  AGENT
+  HUMAN
+  SYSTEM
+}
+
+model Attachment {
+  id       String @id @default(cuid())
+  taskId   String
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  filename String
+  url      String
+  mimeType String
+  size     Int    // bytes
+  
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRADING
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TradingConfig {
+  id          String @id @default(cuid())
+  agentId     String @unique
+  agent       Agent  @relation(fields: [agentId], references: [id])
+  
+  // Risk limits
+  maxPositionSize   Decimal? // In base currency
+  maxDailyLoss      Decimal?
+  maxDrawdown       Decimal? // Percentage
+  maxOrdersPerMinute Int @default(10)
+  
+  // Trading permissions
+  canTradeLive      Boolean @default(false)
+  canTradePaper     Boolean @default(true)
+  allowedExchanges  String[]
+  allowedPairs      String[] // BTC/USDT, ETH/USDT, etc.
+  
+  // Safety
+  killSwitchEnabled Boolean @default(false)
+  lastKillSwitchAt  DateTime?
+  
+  updatedAt         DateTime @updatedAt
+}
+
+model Position {
+  id            String @id @default(cuid())
+  
+  agentId       String
+  exchange      String
+  symbol        String // BTC/USDT
+  side          PositionSide
+  
+  entryPrice    Decimal
+  size          Decimal
+  leverage      Int    @default(1)
+  
+  unrealizedPnl Decimal?
+  realizedPnl   Decimal?
+  
+  status        PositionStatus @default(OPEN)
+  openedAt      DateTime @default(now())
+  closedAt      DateTime?
+  
+  // Relations
+  orders        Order[]
+  
+  @@index([agentId, status])
+  @@index([symbol, status])
+}
+
+enum PositionSide {
+  LONG
+  SHORT
+}
+
+enum PositionStatus {
+  OPEN
+  CLOSED
+  LIQUIDATED
+}
+
+model Order {
+  id          String @id @default(cuid())
+  
+  positionId  String?
+  position    Position? @relation(fields: [positionId], references: [id])
+  
+  agentId     String
+  exchange    String
+  symbol      String
+  
+  side        OrderSide
+  type        OrderType
+  status      OrderStatus @default(PENDING)
+  
+  size        Decimal
+  price       Decimal?    // Null for market orders
+  
+  // Execution
+  executedSize Decimal?
+  executedPrice Decimal?
+  
+  // Metadata
+  strategyId  String?     // Link to strategy that generated this
+  metadata    Json?       // Strategy-specific data
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([agentId, status])
+  @@index([createdAt])
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  STOP_LOSS
+  TAKE_PROFIT
+}
+
+enum OrderStatus {
+  PENDING
+  OPEN
+  FILLED
+  PARTIALLY_FILLED
+  CANCELLED
+  REJECTED
+  EXPIRED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT & COMPLIANCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String @id @default(cuid())
+  
+  timestamp   DateTime @default(now())
+  actorType   ActorType
+  actorId     String?  // Agent ID or User ID
+  actorName   String
+  
+  action      String   // What happened
+  resourceType String  // Task, Position, Order, etc.
+  resourceId  String?
+  
+  beforeState Json?    // Previous state (for changes)
+  afterState  Json?    // New state
+  
+  ipAddress   String?
+  userAgent   String?
+  
+  severity    AuditSeverity @default(INFO)
+  
+  @@index([timestamp])
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+}
+
+enum ActorType {
+  AGENT
+  HUMAN
+  SYSTEM
+  WEBHOOK
+}
+
+enum AuditSeverity {
+  DEBUG
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SystemConfig {
+  id          String @id @default(cuid())
+  key         String @unique
+  value       Json
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+model Webhook {
+  id          String @id @default(cuid())
+  
+  name        String
+  url         String
+  secret      String   // For signature verification
+  
+  eventTypes  String[] // Which events to send
+  
+  isActive    Boolean @default(true)
+  lastUsedAt  DateTime?
+  failCount   Int @default(0)
+  
+  createdAt   DateTime @default(now())
+}
