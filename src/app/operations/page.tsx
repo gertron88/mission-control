@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 
 export default function OperationsPage() {
-  const { data: tasks = [], isLoading: tasksLoading } = useTasks();
+  const { data: tasksData, isLoading: tasksLoading } = useTasks();
+  const tasks = tasksData?.tasks ?? [];
   const { data: agents = [], isLoading: agentsLoading } = useAgents();
   const dispatch = useDispatch();
 

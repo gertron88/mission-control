@@ -89,6 +89,7 @@ export const queryKeys = {
   projects: {
     all: ['projects'] as const,
     lists: () => [...queryKeys.projects.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.projects.lists(), filters] as const,
     details: () => [...queryKeys.projects.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.projects.details(), id] as const,
     dependencies: (id: string) => [...queryKeys.projects.detail(id), 'dependencies'] as const,
@@ -96,6 +97,7 @@ export const queryKeys = {
   agents: {
     all: ['agents'] as const,
     lists: () => [...queryKeys.agents.all, 'list'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.agents.lists(), filters] as const,
     details: () => [...queryKeys.agents.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.agents.details(), id] as const,
   },

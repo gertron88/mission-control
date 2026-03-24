@@ -19,7 +19,7 @@ const stateColors: Record<string, string> = {
 }
 
 export default function ProjectsPage() {
-  const { projects, loading } = useProjects()
+  const { data: projects = [], isLoading: loading } = useProjects()
 
   return (
     <div className="flex">

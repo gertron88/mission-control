@@ -12,7 +12,8 @@ import { Rocket, CheckCircle, AlertCircle, TrendingUp, Clock } from "lucide-reac
 
 export default function DashboardPage() {
   const { data: projects = [], isLoading: projectsLoading } = useProjects();
-  const { data: tasks = [], isLoading: tasksLoading } = useTasks({ status: "BLOCKED" });
+  const { data: tasksData, isLoading: tasksLoading } = useTasks({ status: "BLOCKED" });
+  const tasks = tasksData?.tasks ?? [];
   const { data: agents = [], isLoading: agentsLoading } = useAgents();
 
   const activeProjects = projects.filter((p) => p.state === "EXECUTING").length;

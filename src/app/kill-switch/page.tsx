@@ -6,7 +6,7 @@ import { useAgents } from '@/hooks/useAgents'
 import { AlertTriangle, Shield, Power, Activity } from 'lucide-react'
 
 export default function KillSwitchPage() {
-  const { agents, loading } = useAgents()
+  const { data: agents = [], isLoading: loading } = useAgents()
   const [activating, setActivating] = useState<string | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{ type: string; target?: string } | null>(null)
 

@@ -35,7 +35,7 @@ export function useTasks(filters: TaskFilters = {}): UseQueryResult<{
   meta: { page: number; limit: number; total: number; hasMore: boolean }
 }, Error> {
   return useQuery({
-    queryKey: queryKeys.tasks.list(filters),
+    queryKey: queryKeys.tasks.list(filters as Record<string, unknown>),
     queryFn: () => endpoints.tasks.list(filters),
     refetchInterval: LIST_REFETCH_INTERVAL,
     staleTime: 30000,
