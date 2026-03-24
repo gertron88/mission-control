@@ -210,7 +210,7 @@ export function useBlockTask(): UseMutationResult<
   Error,
   { id: string; blockerType: string; blockerReason: string },
   { previousTask: Task | undefined }
-003e {
+> {
   const queryClient = useQueryClient()
 
   return useMutation({

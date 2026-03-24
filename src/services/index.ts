@@ -51,4 +51,4 @@ export {
 } from './dispatch.service';
 
 // Service Factory
-export { createServices, type Services } from './factory';
+export { createServices, getServices, resetServices, type Services } from './factory';

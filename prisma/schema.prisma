@@ -240,6 +240,7 @@ model Task {
   // Relations
   comments            TaskComment[]
   attachments         Attachment[]
+  artifacts           Artifact[]
   
   // External Links
   discordThreadUrl    String?
@@ -319,6 +320,7 @@ model TimeLog {
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   
   agentId     String
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
   startedAt   DateTime
   endedAt     DateTime?
   duration    Float?   // Hours
