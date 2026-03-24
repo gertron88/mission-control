@@ -1,0 +1,650 @@
+/**
+ * Task Service
+ * 
+ * Handles all task-related business logic including:
+ * - CRUD operations
+ * - Status transitions with state machine validation
+ * - Assignment and blocking
+ * - Audit logging and event broadcasting
+ */
+
+import { PrismaClient, TaskStatus, Prisma, ActorType } from '@prisma/client';
+import { 
+  Result, 
+  StateTransitionError, 
+  ValidationError,
+  TaskBlockedEvent,
+  TaskUnblockedEvent,
+  TaskAssignedEvent,
+  TaskStatusChangedEvent,
+  type TaskStatus as DomainTaskStatus
+} from '@/types/domain';
+import { TaskStateMachine, createTaskStateMachine } from '@/core/state-machines/task.machine';
+import { broadcastEvent } from '@/lib/events';
+import { logAction } from '@/lib/audit';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface TaskServiceDependencies {
+  prisma: PrismaClient;
+}
+
+export interface CreateTaskInput {
+  title: string;
+  description: string;
+  projectId: string;
+  milestoneId?: string;
+  assigneeId?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  type: string;
+  tags?: string[];
+  dueDate?: Date;
+  estimatedEffort?: number;
+  dependencies?: string[];
+  requiredTools?: string[];
+  outputs?: Record<string, unknown>;
+  validationCriteria?: Record<string, unknown>;
+  creatorId: string;
+  creatorHandle: string;
+}
+
+export interface UpdateTaskInput {
+  title?: string;
+  description?: string;
+  status?: TaskStatus;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  assigneeId?: string | null;
+  dueDate?: Date | null;
+  estimatedEffort?: number;
+  actualEffort?: number;
+  actualOutputs?: Record<string, unknown>;
+  retryCount?: number;
+}
+
+export interface AssignTaskInput {
+  taskId: string;
+  agentId: string;
+  assignedBy: string;
+  assignedByHandle: string;
+}
+
+export interface BlockTaskInput {
+  taskId: string;
+  blockerType: string;
+  reason: string;
+  blockedBy: string;
+  blockedByHandle: string;
+}
+
+export interface UnblockTaskInput {
+  taskId: string;
+  resolution: string;
+  unblockedBy: string;
+  unblockedByHandle: string;
+}
+
+export interface StatusTransitionInput {
+  taskId: string;
+  newStatus: TaskStatus;
+  reason?: string;
+  actorId: string;
+  actorHandle: string;
+  metadata?: Record<string, unknown>;
+}
+
+// ============================================================================
+// SERVICE
+// ============================================================================
+
+export class TaskService {
+  constructor(private deps: TaskServiceDependencies) {}
+
+  /**
+   * Get a single task by ID with full details
+   */
+  async getTask(taskId: string): Promise<Result<any, Error>> {
+    try {
+      const task = await this.deps.prisma.task.findFirst({
+        where: { id: taskId, isDeleted: false },
+        include: {
+          assignee: { 
+            select: { 
+              id: true, handle: true, name: true, 
+              avatar: true, status: true, capabilities: true 
+            } 
+          },
+          creator: { select: { id: true, handle: true, name: true } },
+          project: { select: { id: true, name: true, slug: true, state: true } },
+          milestone: { select: { id: true, name: true, state: true } },
+          parent: { select: { id: true, number: true, title: true, status: true } },
+          subtasks: {
+            select: { 
+              id: true, number: true, title: true, 
+              status: true, priority: true,
+              assignee: { select: { handle: true } }
+            },
+          },
+          dependencies: { select: { id: true, number: true, title: true, status: true } },
+          dependents: { select: { id: true, number: true, title: true, status: true } },
+          comments: { orderBy: { createdAt: 'asc' } },
+          attachments: true,
+          timeLogs: { orderBy: { startedAt: 'desc' }, take: 10 },
+        },
+      });
+
+      if (!task) {
+        return Result.err(new Error('Task not found'));
+      }
+
+      return Result.ok(task);
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * List tasks with filtering and pagination
+   */
+  async listTasks(options: {
+    page: number;
+    limit: number;
+    status?: TaskStatus;
+    projectId?: string;
+    assigneeId?: string;
+    milestoneId?: string;
+    priority?: string;
+    type?: string;
+    blockerType?: string;
+    overdue?: boolean;
+    search?: string;
+  }): Promise<Result<{ tasks: any[]; total: number; hasMore: boolean }, Error>> {
+    try {
+      const { page, limit, ...filters } = options;
+      const skip = (page - 1) * limit;
+
+      const where: Prisma.TaskWhereInput = { isDeleted: false };
+
+      if (filters.status) where.status = filters.status;
+      if (filters.projectId) where.projectId = filters.projectId;
+      if (filters.assigneeId) where.assigneeId = filters.assigneeId;
+      if (filters.milestoneId) where.milestoneId = filters.milestoneId;
+      if (filters.priority) where.priority = filters.priority;
+      if (filters.type) where.type = filters.type;
+      if (filters.blockerType) where.blockerType = filters.blockerType;
+
+      if (filters.overdue) {
+        where.dueDate = { lt: new Date() };
+        where.status = { notIn: ['COMPLETE', 'CANCELED'] };
+      }
+
+      if (filters.search) {
+        where.OR = [
+          { title: { contains: filters.search, mode: 'insensitive' } },
+          { description: { contains: filters.search, mode: 'insensitive' } },
+        ];
+      }
+
+      const [tasks, total] = await Promise.all([
+        this.deps.prisma.task.findMany({
+          where,
+          include: {
+            assignee: { select: { id: true, handle: true, name: true, avatar: true, status: true } },
+            creator: { select: { id: true, handle: true, name: true } },
+            project: { select: { id: true, name: true, slug: true } },
+            milestone: { select: { id: true, name: true } },
+            subtasks: { select: { id: true, status: true, title: true } },
+            _count: { select: { comments: true, attachments: true, timeLogs: true } },
+          },
+          orderBy: [
+            { priority: 'desc' },
+            { dueDate: 'asc' },
+            { createdAt: 'desc' },
+          ],
+          skip,
+          take: limit,
+        }),
+        this.deps.prisma.task.count({ where }),
+      ]);
+
+      return Result.ok({
+        tasks,
+        total,
+        hasMore: skip + tasks.length < total,
+      });
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Create a new task
+   */
+  async createTask(input: CreateTaskInput): Promise<Result<any, Error>> {
+    try {
+      // Verify project exists
+      const project = await this.deps.prisma.project.findUnique({
+        where: { id: input.projectId },
+      });
+      if (!project) {
+        return Result.err(new Error('Project not found'));
+      }
+
+      // Verify milestone if specified
+      if (input.milestoneId) {
+        const milestone = await this.deps.prisma.milestone.findFirst({
+          where: { id: input.milestoneId, projectId: input.projectId },
+        });
+        if (!milestone) {
+          return Result.err(new Error('Milestone not found in this project'));
+        }
+      }
+
+      // Verify assignee if specified
+      if (input.assigneeId) {
+        const assignee = await this.deps.prisma.agent.findUnique({
+          where: { id: input.assigneeId },
+        });
+        if (!assignee) {
+          return Result.err(new Error('Assignee not found'));
+        }
+      }
+
+      const task = await this.deps.prisma.task.create({
+        data: {
+          title: input.title,
+          description: input.description,
+          projectId: input.projectId,
+          milestoneId: input.milestoneId,
+          assigneeId: input.assigneeId,
+          priority: input.priority,
+          type: input.type,
+          tags: input.tags || [],
+          dueDate: input.dueDate,
+          estimatedEffort: input.estimatedEffort,
+          dependencies: input.dependencies || [],
+          requiredTools: input.requiredTools || [],
+          outputs: input.outputs || {},
+          validationCriteria: input.validationCriteria || {},
+          creatorId: input.creatorId,
+          status: 'QUEUED',
+          statusHistory: [{
+            status: 'QUEUED',
+            timestamp: new Date().toISOString(),
+            actor: input.creatorHandle,
+            reason: 'Task created',
+          }],
+        },
+        include: {
+          assignee: { select: { id: true, handle: true, name: true } },
+          creator: { select: { id: true, handle: true, name: true } },
+          project: { select: { id: true, name: true } },
+        },
+      });
+
+      // Audit log
+      await logAction({
+        actorType: ActorType.AGENT,
+        actorId: input.creatorId,
+        actorName: input.creatorHandle,
+        action: 'TASK_CREATED',
+        resourceType: 'Task',
+        resourceId: task.id,
+        afterState: task as unknown as Record<string, unknown>,
+      });
+
+      // Broadcast event
+      broadcastEvent({
+        type: 'TASK_CREATED',
+        taskId: task.id,
+        projectId: task.projectId,
+        data: task,
+      });
+
+      return Result.ok(task);
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Update a task with state machine validation
+   */
+  async updateTask(
+    taskId: string,
+    input: UpdateTaskInput,
+    actorId: string,
+    actorHandle: string
+  ): Promise<Result<any, Error>> {
+    try {
+      const currentTask = await this.deps.prisma.task.findFirst({
+        where: { id: taskId, isDeleted: false },
+        include: { assignee: { select: { handle: true, id: true } } },
+      });
+
+      if (!currentTask) {
+        return Result.err(new Error('Task not found'));
+      }
+
+      // Check permissions
+      const isAssignee = currentTask.assigneeId === actorId;
+      const isCreator = currentTask.creatorId === actorId;
+      const actor = await this.deps.prisma.agent.findUnique({ where: { id: actorId } });
+      const isCoordinator = actor?.role === 'COORDINATOR';
+
+      if (!isAssignee && !isCreator && !isCoordinator) {
+        return Result.err(new Error('Only assignee, creator, or coordinator can update this task'));
+      }
+
+      // Validate status transition using state machine
+      if (input.status && input.status !== currentTask.status) {
+        const machine = createTaskStateMachine(taskId, currentTask.status as DomainTaskStatus, {
+          assigneeId: currentTask.assigneeId || undefined,
+          dependencies: currentTask.dependencies as string[],
+          unmetDependencies: [], // Would need to calculate
+          retryCount: currentTask.retryCount,
+          maxRetries: 3,
+        });
+
+        const canTransition = machine.canTransition({ type: this.mapStatusToEvent(input.status) });
+        if (!canTransition) {
+          return Result.err(new StateTransitionError(
+            'TASK',
+            taskId,
+            currentTask.status,
+            input.status,
+            'Invalid state transition'
+          ));
+        }
+      }
+
+      // Build update data
+      const updateData: Prisma.TaskUpdateInput = {};
+      const statusHistory = [...(currentTask.statusHistory as any[] || [])];
+
+      if (input.title !== undefined) updateData.title = input.title;
+      if (input.description !== undefined) updateData.description = input.description;
+      if (input.priority !== undefined) updateData.priority = input.priority;
+      if (input.estimatedEffort !== undefined) updateData.estimatedEffort = input.estimatedEffort;
+      if (input.actualEffort !== undefined) updateData.actualEffort = input.actualEffort;
+      if (input.actualOutputs !== undefined) updateData.actualOutputs = input.actualOutputs;
+      if (input.retryCount !== undefined) updateData.retryCount = input.retryCount;
+      if (input.dueDate !== undefined) updateData.dueDate = input.dueDate;
+
+      // Handle status change
+      if (input.status && input.status !== currentTask.status) {
+        updateData.status = input.status;
+        
+        statusHistory.push({
+          status: input.status,
+          timestamp: new Date().toISOString(),
+          actor: actorHandle,
+          reason: 'Status updated via API',
+        });
+
+        // Track timing
+        if (input.status === 'RUNNING' && !currentTask.startedAt) {
+          updateData.startedAt = new Date();
+        }
+        if (input.status === 'COMPLETE' && !currentTask.completedAt) {
+          updateData.completedAt = new Date();
+        }
+
+        // Clear blocker if moving out of BLOCKED
+        if (input.status !== 'BLOCKED' && currentTask.blockerType) {
+          updateData.blockerType = null;
+          updateData.blockerReason = null;
+          updateData.blockerResolvedAt = new Date();
+        }
+      }
+
+      // Handle assignee change
+      if (input.assigneeId !== undefined) {
+        if (input.assigneeId) {
+          const assignee = await this.deps.prisma.agent.findUnique({
+            where: { id: input.assigneeId },
+          });
+          if (!assignee) {
+            return Result.err(new Error('Assignee not found'));
+          }
+          updateData.assigneeId = input.assigneeId;
+          updateData.assignedAt = new Date();
+          
+          statusHistory.push({
+            status: currentTask.status,
+            timestamp: new Date().toISOString(),
+            actor: actorHandle,
+            reason: `Assigned to ${assignee.handle}`,
+          });
+        } else {
+          updateData.assigneeId = null;
+        }
+      }
+
+      updateData.statusHistory = statusHistory;
+
+      const updatedTask = await this.deps.prisma.task.update({
+        where: { id: taskId },
+        data: updateData,
+        include: {
+          assignee: { select: { id: true, handle: true, name: true } },
+          project: { select: { id: true, name: true } },
+        },
+      });
+
+      // Audit log
+      await logAction({
+        actorType: ActorType.AGENT,
+        actorId,
+        actorName: actorHandle,
+        action: input.status ? 'TASK_STATUS_CHANGED' : 'TASK_UPDATED',
+        resourceType: 'Task',
+        resourceId: taskId,
+        beforeState: currentTask as unknown as Record<string, unknown>,
+        afterState: updatedTask as unknown as Record<string, unknown>,
+      });
+
+      // Broadcast event
+      broadcastEvent({
+        type: 'TASK_UPDATED',
+        taskId: updatedTask.id,
+        projectId: updatedTask.projectId,
+        changes: { status: input.status, assigneeId: input.assigneeId },
+      });
+
+      return Result.ok(updatedTask);
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Delete (soft delete) a task
+   */
+  async deleteTask(taskId: string, actorId: string, actorHandle: string): Promise<Result<void, Error>> {
+    try {
+      const task = await this.deps.prisma.task.findFirst({
+        where: { id: taskId, isDeleted: false },
+      });
+
+      if (!task) {
+        return Result.err(new Error('Task not found'));
+      }
+
+      const actor = await this.deps.prisma.agent.findUnique({ where: { id: actorId } });
+      if (task.creatorId !== actorId && actor?.role !== 'COORDINATOR') {
+        return Result.err(new Error('Only creator or coordinator can delete'));
+      }
+
+      await this.deps.prisma.task.update({
+        where: { id: taskId },
+        data: { isDeleted: true, deletedAt: new Date() },
+      });
+
+      await logAction({
+        actorType: ActorType.AGENT,
+        actorId,
+        actorName: actorHandle,
+        action: 'TASK_DELETED',
+        resourceType: 'Task',
+        resourceId: taskId,
+      });
+
+      broadcastEvent({ type: 'TASK_DELETED', taskId });
+
+      return Result.ok(undefined);
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Assign a task to an agent
+   */
+  async assignTask(input: AssignTaskInput): Promise<Result<any, Error>> {
+    return this.updateTask(
+      input.taskId,
+      { assigneeId: input.agentId },
+      input.assignedBy,
+      input.assignedByHandle
+    );
+  }
+
+  /**
+   * Block a task with a reason
+   */
+  async blockTask(input: BlockTaskInput): Promise<Result<any, Error>> {
+    try {
+      const task = await this.deps.prisma.task.findFirst({
+        where: { id: input.taskId, isDeleted: false },
+      });
+
+      if (!task) {
+        return Result.err(new Error('Task not found'));
+      }
+
+      const statusHistory = [...(task.statusHistory as any[] || [])];
+      statusHistory.push({
+        status: 'BLOCKED',
+        timestamp: new Date().toISOString(),
+        actor: input.blockedByHandle,
+        reason: input.reason,
+      });
+
+      const updatedTask = await this.deps.prisma.task.update({
+        where: { id: input.taskId },
+        data: {
+          status: 'BLOCKED',
+          blockerType: input.blockerType,
+          blockerReason: input.reason,
+          statusHistory,
+        },
+        include: {
+          assignee: { select: { id: true, handle: true, name: true } },
+          project: { select: { id: true, name: true } },
+        },
+      });
+
+      await logAction({
+        actorType: ActorType.AGENT,
+        actorId: input.blockedBy,
+        actorName: input.blockedByHandle,
+        action: 'TASK_BLOCKED',
+        resourceType: 'Task',
+        resourceId: input.taskId,
+        afterState: updatedTask as unknown as Record<string, unknown>,
+      });
+
+      broadcastEvent({
+        type: 'TASK_BLOCKED',
+        taskId: input.taskId,
+        data: { blockerType: input.blockerType, reason: input.reason },
+      });
+
+      return Result.ok(updatedTask);
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Unblock a task
+   */
+  async unblockTask(input: UnblockTaskInput): Promise<Result<any, Error>> {
+    try {
+      const task = await this.deps.prisma.task.findFirst({
+        where: { id: input.taskId, isDeleted: false },
+      });
+
+      if (!task) {
+        return Result.err(new Error('Task not found'));
+      }
+
+      if (task.status !== 'BLOCKED') {
+        return Result.err(new Error('Task is not blocked'));
+      }
+
+      const statusHistory = [...(task.statusHistory as any[] || [])];
+      statusHistory.push({
+        status: 'RUNNING',
+        timestamp: new Date().toISOString(),
+        actor: input.unblockedByHandle,
+        reason: `Unblocked: ${input.resolution}`,
+      });
+
+      const updatedTask = await this.deps.prisma.task.update({
+        where: { id: input.taskId },
+        data: {
+          status: 'RUNNING',
+          blockerType: null,
+          blockerReason: null,
+          blockerResolvedAt: new Date(),
+          statusHistory,
+        },
+        include: {
+          assignee: { select: { id: true, handle: true, name: true } },
+          project: { select: { id: true, name: true } },
+        },
+      });
+
+      await logAction({
+        actorType: ActorType.AGENT,
+        actorId: input.unblockedBy,
+        actorName: input.unblockedByHandle,
+        action: 'TASK_UNBLOCKED',
+        resourceType: 'Task',
+        resourceId: input.taskId,
+        afterState: updatedTask as unknown as Record<string, unknown>,
+      });
+
+      broadcastEvent({
+        type: 'TASK_UNBLOCKED',
+        taskId: input.taskId,
+        data: { resolution: input.resolution },
+      });
+
+      return Result.ok(updatedTask);
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Map task status to state machine event type
+   */
+  private mapStatusToEvent(status: TaskStatus): any {
+    const mapping: Record<string, string> = {
+      'QUEUED': 'DEPENDENCIES_UNMET',
+      'READY': 'DEPENDENCIES_MET',
+      'ASSIGNED': 'ASSIGNED',
+      'RUNNING': 'STARTED',
+      'AWAITING_VALIDATION': 'COMPLETED',
+      'COMPLETE': 'VALIDATED',
+      'FAILED': 'FAILED',
+      'BLOCKED': 'BLOCKED',
+      'CANCELED': 'CANCEL',
+    };
+    return mapping[status] || status;
+  }
+}
