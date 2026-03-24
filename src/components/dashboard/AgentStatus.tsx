@@ -20,7 +20,7 @@ const statusLabels: Record<string, string> = {
 }
 
 export function AgentStatus() {
-  const { agents, loading } = useAgents()
+  const { data: agents, isLoading: loading } = useAgents()
 
   if (loading) {
     return (
@@ -44,7 +44,7 @@ export function AgentStatus() {
       </div>
 
       <div className="divide-y divide-slate-200">
-        {agents.map((agent) => (
+        {agents?.map((agent) => (
           <div key={agent.id} className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

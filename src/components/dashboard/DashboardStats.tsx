@@ -13,14 +13,16 @@ import {
 } from 'lucide-react'
 
 export function DashboardStats() {
-  const { projects } = useProjects()
-  const { agents } = useAgents()
-  const { tasks } = useTasks()
+  const { data: projects } = useProjects()
+  const { data: agents } = useAgents()
+  const { data: tasksResult } = useTasks()
 
-  const activeProjects = projects.filter(p => ['EXECUTING', 'PLANNING'].includes(p.state)).length
+  const tasks = tasksResult?.tasks || []
+
+  const activeProjects = projects?.filter(p => ['EXECUTING', 'PLANNING'].includes(p.state)).length || 0
   const blockedTasks = tasks.filter(t => t.status === 'BLOCKED').length
-  const onlineAgents = agents.filter(a => a.status === 'ONLINE').length
-  const totalAgents = agents.length
+  const onlineAgents = agents?.filter(a => a.status === 'ONLINE').length || 0
+  const totalAgents = agents?.length || 0
 
   const stats = [
     { 
@@ -28,7 +30,7 @@ export function DashboardStats() {
       value: activeProjects, 
       icon: FolderKanban, 
       color: 'bg-blue-500',
-      total: projects.length 
+      total: projects?.length || 0
     },
     { 
       name: 'Blocked Tasks', 
