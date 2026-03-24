@@ -11,6 +11,8 @@ import { ProjectService } from './project.service';
 import { AgentService } from './agent.service';
 import { DependencyService } from './dependency.service';
 import { DispatchService } from './dispatch.service';
+import { EscalationService } from './escalation.service';
+import { NotificationService } from './notification.service';
 
 // ============================================================================
 // TYPES
@@ -22,6 +24,8 @@ export interface Services {
   agent: AgentService;
   dependency: DependencyService;
   dispatch: DispatchService;
+  escalation: EscalationService;
+  notification: NotificationService;
 }
 
 // ============================================================================
@@ -43,19 +47,18 @@ export function createServices(prisma: PrismaClient): Services {
   const project = new ProjectService({ prisma });
   const agent = new AgentService({ prisma });
   const dependency = new DependencyService({ prisma });
-  const dispatch = new DispatchService({ 
-    prisma,
-    task,
-    agent,
-    dependency 
-  });
+  const dispatch = new DispatchService({ prisma });
+  const escalation = new EscalationService({ prisma });
+  const notification = new NotificationService({ prisma });
 
   servicesInstance = {
     task,
     project,
     agent,
     dependency,
-    dispatch
+    dispatch,
+    escalation,
+    notification
   };
 
   return servicesInstance;
