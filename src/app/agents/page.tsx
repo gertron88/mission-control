@@ -13,7 +13,7 @@ const statusColors: Record<string, string> = {
 }
 
 export default function AgentsPage() {
-  const { agents, loading } = useAgents()
+  const { data: agents, isLoading: loading } = useAgents()
 
   return (
     <div className="flex">
@@ -36,7 +36,7 @@ export default function AgentsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {agents.map((agent) => (
+              {agents?.map((agent) => (
                 <div key={agent.id} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">

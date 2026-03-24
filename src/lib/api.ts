@@ -380,6 +380,11 @@ export interface Agent {
     status: string
     load: number
   }>
+  performanceStats?: {
+    success_rate: number
+    tasks_completed: number
+    average_task_time?: number
+  }
   tradingConfig?: {
     maxPositionSize: number
     riskTolerance: string

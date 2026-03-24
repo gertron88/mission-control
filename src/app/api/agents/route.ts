@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       _count: {
         select: {
           assignedTasks: {
-            where: { status: { in: ['TODO', 'IN_PROGRESS', 'IN_REVIEW'] } },
+            where: { status: { in: ['QUEUED', 'READY', 'ASSIGNED', 'RUNNING'] } },
           },
         },
       },

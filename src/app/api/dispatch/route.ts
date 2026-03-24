@@ -19,16 +19,16 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   
   const services = getServices();
   
-  const result = await services.dispatch.runDispatchLoop();
+  const result = await services.dispatch.batchDispatch(agent.id);
 
   if (!result.ok) {
     throw new ApiError('INTERNAL_ERROR', result.error.message, 500);
   }
 
   return successResponse({
-    dispatched: result.value.dispatched,
+    dispatched: result.value.stats.assigned,
     assignments: result.value.assignments,
-    errors: result.value.errors
+    errors: []
   });
 });
 

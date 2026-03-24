@@ -12,7 +12,7 @@ export async function GET(
     where: { id: params.id },
     include: {
       assignedTasks: {
-        where: { status: { not: 'DONE' } },
+        where: { status: { not: 'COMPLETE' } },
         orderBy: { priority: 'desc' },
         select: {
           id: true,

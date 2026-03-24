@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { BlockerType } from '@prisma/client'
 
 // GET /api/blockers - Get all blocked tasks across projects
 export async function GET(request: NextRequest) {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     where: {
       status: 'BLOCKED',
       ...(projectId && { projectId }),
-      ...(blockerType && { blockerType }),
+      ...(blockerType && { blockerType: blockerType as BlockerType }),
     },
     include: {
       project: { select: { id: true, name: true, state: true } },
