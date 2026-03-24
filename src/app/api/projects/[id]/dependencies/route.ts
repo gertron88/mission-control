@@ -16,7 +16,7 @@ export const GET = withErrorHandler(async (
 ) => {
   const services = getServices();
   
-  const result = await services.dependency.getProjectDependencyGraph(params.id);
+  const result = await services.dependency.buildDependencyGraph(params.id);
 
   if (!result.ok) {
     throw new ApiError('NOT_FOUND', result.error.message, 404);
@@ -32,20 +32,15 @@ export const POST = withErrorHandler(async (
 ) => {
   const services = getServices();
   
-  const result = await services.dependency.resolveProjectDependencies(params.id);
+  const result = await services.dependency.resolveDependencies({ projectId: params.id });
 
   if (!result.ok) {
     throw new ApiError('INTERNAL_ERROR', result.error.message, 500);
   }
 
-  // Trigger dispatch for newly unblocked tasks
-  if (result.value.unblockedTasks.length > 0) {
-    await services.dispatch.runDispatchLoop();
-  }
-
   return successResponse({
-    unblockedTasks: result.value.unblockedTasks,
-    blockedTasks: result.value.blockedTasks,
+    resolved: result.value.resolved,
+    stillBlocked: result.value.stillBlocked,
     cycles: result.value.cycles
   });
 });

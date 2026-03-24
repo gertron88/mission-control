@@ -8,6 +8,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '@/lib/api-utils';
+import { RiskStatus } from '@prisma/client';
 
 interface RouteParams {
   params: { id: string };
@@ -18,7 +19,7 @@ export const GET = withErrorHandler(async (request: NextRequest, { params }: Rou
   const { id: projectId } = params;
   
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get('status') as string | undefined;
+  const status = searchParams.get('status') as RiskStatus | undefined;
   
   const risks = await prisma.risk.findMany({
     where: {

@@ -18,12 +18,12 @@ export const GET = withErrorHandler(async (request: NextRequest, { params }: Rou
   const { id: projectId } = params;
   
   const { searchParams } = new URL(request.url);
-  const state = searchParams.get('state') as string | undefined;
+  const status = searchParams.get('status') as 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'SUPERSEDED' | undefined;
   
   const decisions = await prisma.decision.findMany({
     where: {
       projectId,
-      ...(state && { state })
+      ...(status && { status })
     },
     orderBy: { createdAt: 'desc' }
   });

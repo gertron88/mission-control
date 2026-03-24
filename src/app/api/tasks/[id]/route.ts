@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { getServices } from '@/services';
 import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '@/lib/api-utils';
 import { TaskStatus, TaskPriority } from '@prisma/client';
+import { DomainError } from '@/types/domain';
 
 const updateTaskSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -55,39 +56,43 @@ export const PATCH = withErrorHandler(async (
 
   // Handle status transition separately if status is being updated
   if (validated.status) {
-    const transitionResult = await services.task.transitionStatus({
-      taskId: params.id,
-      newStatus: validated.status,
-      reason: validated.reason,
-      actorId: agent.id,
-      actorHandle: agent.handle
-    });
+    const transitionResult = await services.task.updateTask(
+      params.id,
+      { status: validated.status },
+      agent.id,
+      agent.handle
+    );
 
     if (!transitionResult.ok) {
-      const error = transitionResult.error;
-      if (error.code === 'STATE_TRANSITION_ERROR') {
-        throw new ApiError('INVALID_TRANSITION', error.message, 409);
+      const domainError = transitionResult.error as DomainError;
+      if (domainError.code === 'STATE_TRANSITION_ERROR') {
+        throw new ApiError('INVALID_TRANSITION', domainError.message, 409);
       }
-      if (error.code === 'NOT_FOUND') {
-        throw new ApiError('NOT_FOUND', error.message, 404);
+      if (domainError.code === 'NOT_FOUND') {
+        throw new ApiError('NOT_FOUND', domainError.message, 404);
       }
-      throw new ApiError('INTERNAL_ERROR', error.message, 500);
+      throw new ApiError('INTERNAL_ERROR', transitionResult.error.message, 500);
     }
 
     return successResponse(transitionResult.value);
   }
 
   // Regular update (no status change)
-  const updateResult = await services.task.updateTask(params.id, {
-    title: validated.title,
-    description: validated.description,
-    priority: validated.priority,
-    assigneeId: validated.assigneeId,
-    dueDate: validated.dueDate ? new Date(validated.dueDate) : undefined,
-    estimatedEffort: validated.estimatedEffort,
-    actualEffort: validated.actualEffort,
-    actualOutputs: validated.actualOutputs
-  });
+  const updateResult = await services.task.updateTask(
+    params.id,
+    {
+      title: validated.title,
+      description: validated.description,
+      priority: validated.priority,
+      assigneeId: validated.assigneeId,
+      dueDate: validated.dueDate ? new Date(validated.dueDate) : undefined,
+      estimatedEffort: validated.estimatedEffort,
+      actualEffort: validated.actualEffort,
+      actualOutputs: validated.actualOutputs
+    },
+    agent.id,
+    agent.handle
+  );
 
   if (!updateResult.ok) {
     throw new ApiError('INTERNAL_ERROR', updateResult.error.message, 500);
@@ -106,10 +111,7 @@ export const DELETE = withErrorHandler(async (
   
   const services = getServices();
   
-  const result = await services.task.deleteTask(params.id, {
-    deletedBy: agent.id,
-    deletedByHandle: agent.handle
-  });
+  const result = await services.task.deleteTask(params.id, agent.id, agent.handle);
 
   if (!result.ok) {
     throw new ApiError('NOT_FOUND', 'Task not found', 404);

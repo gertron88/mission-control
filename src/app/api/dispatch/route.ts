@@ -47,8 +47,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   // Get available agents
   const agents = await services.agent.listAgents({
-    status: 'ONLINE',
-    hasCapacity: true
+    status: 'ONLINE'
   });
 
   return successResponse({

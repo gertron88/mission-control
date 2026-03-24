@@ -17,6 +17,7 @@ import { prisma } from '@/lib/prisma';
 import { getServices } from '@/services';
 import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '@/lib/api-utils';
 import { TaskStatus, TaskPriority, TaskType } from '@prisma/client';
+import { DomainError } from '@/types/domain';
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -126,10 +127,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   });
 
   if (!result.ok) {
-    if (result.error.code === 'VALIDATION_ERROR') {
+    const domainError = result.error as DomainError;
+    if (domainError.code === 'VALIDATION_ERROR') {
       throw new ApiError('VALIDATION_ERROR', result.error.message, 400);
     }
-    if (result.error.code === 'NOT_FOUND') {
+    if (domainError.code === 'NOT_FOUND') {
       throw new ApiError('NOT_FOUND', result.error.message, 404);
     }
     throw new ApiError('INTERNAL_ERROR', result.error.message, 500);

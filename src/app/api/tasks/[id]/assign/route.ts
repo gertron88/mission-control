@@ -8,6 +8,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getServices } from '@/services';
 import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '@/lib/api-utils';
+import { DomainError } from '@/types/domain';
 
 const assignSchema = z.object({
   agentId: z.string().optional(), // If not provided, auto-assign
@@ -35,7 +36,8 @@ export const POST = withErrorHandler(async (
     });
 
     if (!result.ok) {
-      if (result.error.code === 'NOT_FOUND') {
+      const domainError = result.error as DomainError;
+      if (domainError.code === 'NOT_FOUND') {
         throw new ApiError('NOT_FOUND', result.error.message, 404);
       }
       throw new ApiError('INTERNAL_ERROR', result.error.message, 500);
@@ -45,14 +47,35 @@ export const POST = withErrorHandler(async (
   }
 
   // Auto-assignment using dispatcher
-  const dispatchResult = await services.dispatch.dispatchSingleTask(params.id);
+  const recommendResult = await services.dispatch.recommendAgent(params.id);
 
-  if (!dispatchResult.ok) {
-    if (dispatchResult.error.code === 'NO_ELIGIBLE_AGENTS') {
-      throw new ApiError('NO_AGENTS_AVAILABLE', dispatchResult.error.message, 422);
+  if (!recommendResult.ok) {
+    const domainError = recommendResult.error as DomainError;
+    if (domainError.code === 'NO_ELIGIBLE_AGENTS') {
+      throw new ApiError('NO_AGENTS_AVAILABLE', recommendResult.error.message, 422);
     }
-    throw new ApiError('INTERNAL_ERROR', dispatchResult.error.message, 500);
+    throw new ApiError('INTERNAL_ERROR', recommendResult.error.message, 500);
   }
 
-  return successResponse(dispatchResult.value);
+  // Assign to recommended agent
+  if (!recommendResult.value.recommendedAgentId) {
+    throw new ApiError('NO_AGENTS_AVAILABLE', 'No eligible agents found for this task', 422);
+  }
+  
+  const assignResult = await services.task.assignTask({
+    taskId: params.id,
+    agentId: recommendResult.value.recommendedAgentId,
+    assignedBy: agent.id,
+    assignedByHandle: agent.handle
+  });
+
+  if (!assignResult.ok) {
+    const domainError = assignResult.error as DomainError;
+    if (domainError.code === 'NOT_FOUND') {
+      throw new ApiError('NOT_FOUND', assignResult.error.message, 404);
+    }
+    throw new ApiError('INTERNAL_ERROR', assignResult.error.message, 500);
+  }
+
+  return successResponse(assignResult.value);
 });
