@@ -1,95 +1,71 @@
+/**
+ * Projects React Query Hooks
+ * 
+ * Provides:
+ * - useProjects: List all projects
+ * - useProject: Get single project details
+ * - useProjectDependencies: Get task dependencies for a project
+ */
+
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useQuery, UseQueryResult } from '@tanstack/react-query'
+import { queryKeys, LIST_REFETCH_INTERVAL } from '@/lib/query-client'
+import { endpoints, Project, ProjectDependencies } from '@/lib/api'
 
-interface Project {
-  id: string
-  name: string
-  state: string
-  charter?: string
-  description?: string
-  budgetAllocated?: number
-  budgetSpent: number
-  plannedStart?: string
-  plannedEnd?: string
-  actualStart?: string
-  actualEnd?: string
-  portfolio?: {
-    id: string
-    name: string
-  }
-  _count?: {
-    tasks: number
-    milestones: number
-  }
-  tasks?: Array<{
-    id: string
-    number: number
-    title: string
-    status: string
-    blockerType?: string
-  }>
+/**
+ * Hook for fetching all projects
+ * 
+ * Features:
+ * - Automatic refetching every 60s
+ * - Includes task counts and milestone counts
+ * - Includes blocked/failed tasks
+ */
+export function useProjects(options?: {
+  portfolioId?: string
+  state?: string
+}): UseQueryResult<Project[], Error> {
+  return useQuery({
+    queryKey: queryKeys.projects.list(options || {}),
+    queryFn: () => endpoints.projects.list(options),
+    refetchInterval: LIST_REFETCH_INTERVAL,
+    staleTime: 30000,
+  })
 }
 
-export function useProjects() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/projects')
-      if (!response.ok) throw new Error('Failed to fetch projects')
-      const data = await response.json()
-      setProjects(data)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchProjects()
-  }, [])
-
-  return { projects, loading, error, refetch: fetchProjects }
+/**
+ * Hook for fetching a single project
+ * 
+ * Features:
+ * - Detailed project info
+ * - Associated blocked/failed tasks
+ * - Portfolio information
+ */
+export function useProject(projectId: string): UseQueryResult<Project, Error> {
+  return useQuery({
+    queryKey: queryKeys.projects.detail(projectId),
+    queryFn: () => endpoints.projects.get(projectId),
+    enabled: !!projectId,
+    staleTime: 60000,
+  })
 }
 
-export function useProject(projectId: string) {
-  const [project, setProject] = useState<Project | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const fetchProject = async () => {
-    try {
-      const response = await fetch(`/api/projects/${projectId}`)
-      if (!response.ok) throw new Error('Failed to fetch project')
-      const data = await response.json()
-      setProject(data)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (projectId) {
-      fetchProject()
-    }
-  }, [projectId])
-
-  const updateProject = async (updates: Partial<Project>) => {
-    const response = await fetch(`/api/projects/${projectId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    })
-    if (!response.ok) throw new Error('Failed to update project')
-    await fetchProject()
-    return response.json()
-  }
-
-  return { project, loading, error, refetch: fetchProject, updateProject }
+/**
+ * Hook for fetching project dependencies
+ * 
+ * Returns:
+ * - Tasks in the project
+ * - Dependency graph
+ * - Blocked tasks
+ * - Ready tasks (dependencies met)
+ */
+export function useProjectDependencies(
+  projectId: string
+): UseQueryResult<ProjectDependencies, Error> {
+  return useQuery({
+    queryKey: queryKeys.projects.dependencies(projectId),
+    queryFn: () => endpoints.projects.dependencies(projectId),
+    enabled: !!projectId,
+    staleTime: 30000,
+  })
 }
