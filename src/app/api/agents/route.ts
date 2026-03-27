@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { logAction } from '@/lib/audit'
 import { ActorType } from '@prisma/client'
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic'
+
 // GET /api/agents - List all agents
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)

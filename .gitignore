@@ -9,3 +9,4 @@
 /.cache
 /dist
 *.tsbuildinfo
+.vercel

@@ -19,6 +19,9 @@ import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '
 import { TaskStatus, TaskPriority, TaskType } from '@prisma/client';
 import { DomainError } from '@/types/domain';
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic'
+
 // ============================================================================
 // VALIDATION SCHEMAS
 // ============================================================================
@@ -80,14 +83,14 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   
   const overdue = searchParams.get('overdue') === 'true';
   
-  const search = searchParams.get('search');
+  const search = searchParams.get('search') || undefined;
   
   const page = parseInt(searchParams.get('page') || '1');
   const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
 
   const services = getServices();
   const result = await services.task.listTasks({
-    filters,
+    ...filters,
     overdue,
     search,
     page,

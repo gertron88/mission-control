@@ -7,7 +7,7 @@
  * - Agent metrics
  */
 
-import { PrismaClient, ActorType } from '@prisma/client';
+import { PrismaClient, ActorType, AgentStatus, AgentRole, Prisma } from '@prisma/client';
 import { Result } from '@/types/domain';
 import { broadcastEvent } from '@/lib/events';
 import { logAction } from '@/lib/audit';
@@ -22,11 +22,11 @@ export interface AgentServiceDependencies {
 
 export interface RecordHeartbeatInput {
   agentId: string;
-  status?: string;
+  status?: AgentStatus;
   cpuUsage?: number;
   memoryUsage?: number;
   activeTaskCount?: number;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonValue;
 }
 
 export interface AgentMetrics {
@@ -35,9 +35,9 @@ export interface AgentMetrics {
   totalTasksFailed: number;
   successRate: number;
   averageTaskDuration?: number;
-  lastSeenAt?: Date;
+  lastSeenAt?: Date | null;
   currentLoad: number;
-  currentStatus: string;
+  currentStatus: AgentStatus;
 }
 
 // ============================================================================
@@ -114,13 +114,18 @@ export class AgentService {
   /**
    * List all agents
    */
-  async listAgents(options?: { status?: string; role?: string }): Promise<Result<any[], Error>> {
+  async listAgents(options?: { status?: AgentStatus; role?: AgentRole; }): Promise<Result<any[], Error>> {
     try {
-      const agents = await this.deps.prisma.agent.findMany({
-        where: {
-          ...(options?.status && { status: options.status }),
-          ...(options?.role && { role: options.role }),
-        },
+      const where: Prisma.AgentWhereInput = {};
+if (options?.status) {
+  where.status = { equals: options.status };
+}
+if (options?.role) {
+  where.role = { equals: options.role };
+}
+
+const agents = await this.deps.prisma.agent.findMany({
+where,
         include: {
           _count: {
             select: {
@@ -218,7 +223,7 @@ export class AgentService {
    */
   async updateAgentStatus(
     agentId: string, 
-    status: string,
+    status: AgentStatus | undefined,
     actorId: string,
     actorName: string
   ): Promise<Result<any, Error>> {

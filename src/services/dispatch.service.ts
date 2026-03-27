@@ -74,7 +74,7 @@ export class DispatchService {
       // Get task details
       const task = await this.deps.prisma.task.findUnique({
         where: { id: taskId },
-        include: { project: { select: { priority: true } } },
+        include: { project: { select: { id: true, name: true } } },
       });
 
       if (!task) {
@@ -105,7 +105,7 @@ export class DispatchService {
         capabilities: a.capabilities as string[] || [],
         status: a.status as Agent['status'],
         currentLoad: a.currentLoad || 0,
-        maxLoad: a.maxConcurrentTasks || 5,
+        maxLoad: a.maxLoad || 5,
         trustLevel: a.trustLevel || 0.5,
         costPerHour: undefined,
         performanceStats: a.performanceStats as any,
@@ -208,7 +208,7 @@ export class DispatchService {
           assigneeId: null,
           isDeleted: false,
         },
-        include: { project: { select: { priority: true } } },
+        include: { project: { select: { id: true, name: true } } },
       });
 
       // Get available agents
@@ -232,7 +232,7 @@ export class DispatchService {
         priority: t.priority as Task['priority'],
         requiredTools: t.requiredTools as string[] || [],
         estimatedEffort: t.estimatedEffort || 1,
-        projectPriority: t.project?.priority || 50,
+        projectPriority: 50,
       }));
 
       const domainAgents: Agent[] = agents.map(a => ({
@@ -242,7 +242,7 @@ export class DispatchService {
         capabilities: a.capabilities as string[] || [],
         status: a.status as Agent['status'],
         currentLoad: a.currentLoad || 0,
-        maxLoad: a.maxConcurrentTasks || 5,
+        maxLoad: a.maxLoad || 5,
         trustLevel: a.trustLevel || 0.5,
         performanceStats: a.performanceStats as any,
       }));
@@ -343,7 +343,7 @@ export class DispatchService {
         capabilities: agent.capabilities as string[] || [],
         status: agent.status as Agent['status'],
         currentLoad: agent.currentLoad || 0,
-        maxLoad: agent.maxConcurrentTasks || 5,
+        maxLoad: agent.maxLoad || 5,
         trustLevel: agent.trustLevel || 0.5,
         performanceStats: agent.performanceStats as any,
       };
@@ -352,7 +352,7 @@ export class DispatchService {
 
       const reasons: string[] = [];
       if (agent.status !== 'ONLINE') reasons.push('Agent is not online');
-      if (agent.currentLoad >= (agent.maxConcurrentTasks || 5)) {
+      if (agent.currentLoad >= (agent.maxLoad || 5)) {
         reasons.push('Agent is at capacity');
       }
 

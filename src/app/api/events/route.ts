@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server'
 import { eventBus } from '@/lib/events'
 
+// Force dynamic rendering - this route uses Server-Sent Events
+export const dynamic = 'force-dynamic'
+
 // GET /api/events - Server-Sent Events endpoint
 export async function GET(request: NextRequest) {
   const encoder = new TextEncoder()

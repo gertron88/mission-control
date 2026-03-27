@@ -243,9 +243,10 @@ export class DatabaseEventStore implements EventStore {
     const where: Record<string, unknown> = {};
     
     if (options.from || options.to) {
-      where.timestamp = {};
-      if (options.from) where.timestamp.gte = options.from;
-      if (options.to) where.timestamp.lte = options.to;
+      const timestampFilter: { gte?: Date; lte?: Date } = {};
+      if (options.from) timestampFilter.gte = options.from;
+      if (options.to) timestampFilter.lte = options.to;
+      where.timestamp = timestampFilter;
     }
     
     if (options.types?.length) {
@@ -273,7 +274,17 @@ export class DatabaseEventStore implements EventStore {
 // ============================================================================
 
 export class EventBuilder {
-  private event: Partial<DomainEventBase> = {
+  private event: {
+    id?: string;
+    type?: string;
+    timestamp?: Date;
+    aggregateType?: string;
+    aggregateId?: string;
+    version?: number;
+    actor?: { type: 'AGENT' | 'HUMAN' | 'SYSTEM'; id: string };
+    metadata?: Record<string, unknown>;
+    payload?: unknown;
+  } = {
     version: 1,
     timestamp: new Date()
   };
@@ -326,7 +337,8 @@ export class EventBuilder {
       this.event.id = `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
     
-    return this.event as DomainEventBase;
+    // Cast to DomainEventBase - all required fields should be set by now
+    return this.event as unknown as DomainEventBase;
   }
 }
 

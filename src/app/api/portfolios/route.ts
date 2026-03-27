@@ -13,6 +13,9 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '@/lib/api-utils';
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic'
+
 // GET /api/portfolios - List portfolios
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);

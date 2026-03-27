@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { BlockerType } from '@prisma/client'
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic'
+
 // GET /api/blockers - Get all blocked tasks across projects
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)

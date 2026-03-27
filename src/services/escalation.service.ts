@@ -275,7 +275,7 @@ export class EscalationService {
         resourceId: log.resourceId || '',
         projectId: log.resourceId || '',
         message: log.action,
-        metadata: log.afterState
+        metadata: log.afterState as Record<string, unknown> | undefined
       }));
 
       return Result.ok(escalations);

@@ -11,6 +11,9 @@ import { prisma } from '@/lib/prisma';
 import { getServices } from '@/services';
 import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '@/lib/api-utils';
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic'
+
 // GET /api/notifications
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const apiKey = request.headers.get('x-api-key') || '';

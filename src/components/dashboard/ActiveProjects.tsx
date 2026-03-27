@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useProjects } from '@/hooks/useProjects'
 import { ArrowRight, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react'
+import { Project } from '@/lib/api'
 
 const stateColors: Record<string, string> = {
   PROPOSED: 'bg-gray-100 text-gray-700',
@@ -24,9 +25,9 @@ const stateIcons: Record<string, React.ElementType> = {
 }
 
 export function ActiveProjects() {
-  const { projects, loading } = useProjects()
+  const { data: projects, isLoading } = useProjects()
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
         <div className="animate-pulse space-y-4">
@@ -41,7 +42,7 @@ export function ActiveProjects() {
     )
   }
 
-  const activeProjects = projects.filter(p => 
+  const activeProjects = (projects || []).filter(p => 
     !['COMPLETED', 'ARCHIVED', 'FAILED'].includes(p.state)
   ).slice(0, 5)
 

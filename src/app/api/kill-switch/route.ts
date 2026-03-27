@@ -5,6 +5,9 @@ import { sendToDiscord } from '@/lib/discord'
 import { broadcastEvent } from '@/lib/events'
 import { ActorType, AuditSeverity } from '@prisma/client'
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic'
+
 // POST /api/kill-switch - Emergency stop
 export async function POST(request: NextRequest) {
   try {

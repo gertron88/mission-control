@@ -4,6 +4,9 @@ import { logAction } from '@/lib/audit'
 import { ActorType, ProjectState, AuditSeverity } from '@prisma/client'
 import { z } from 'zod'
 
+// Force dynamic rendering for API route
+export const dynamic = 'force-dynamic'
+
 const createProjectSchema = z.object({
   portfolioId: z.string(),
   name: z.string().min(1),
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
         name: data.name,
         charter: data.charter,
         description: data.description,
-        objectives: data.objectives,
+        slug: data.name.toLowerCase().replace(/\s+/g, '-'),
         successMetrics: data.successMetrics,
         budgetAllocated: data.budgetAllocated,
         plannedStart: data.plannedStart ? new Date(data.plannedStart) : undefined,

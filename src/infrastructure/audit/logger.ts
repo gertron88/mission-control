@@ -6,6 +6,7 @@
  */
 
 import { Result } from '../../types/domain';
+import { PrismaClient } from '@prisma/client';
 
 // ============================================================================
 // TYPES
@@ -229,9 +230,10 @@ export class AuditLogger {
       const where: Record<string, unknown> = {};
 
       if (filter.from || filter.to) {
-        where.timestamp = {};
-        if (filter.from) where.timestamp.gte = filter.from;
-        if (filter.to) where.timestamp.lte = filter.to;
+        const timestampFilter: { gte?: Date; lte?: Date } = {};
+        if (filter.from) timestampFilter.gte = filter.from;
+        if (filter.to) timestampFilter.lte = filter.to;
+        where.timestamp = timestampFilter;
       }
 
       if (filter.actorId) where.actorId = filter.actorId;
@@ -331,10 +333,10 @@ export class AuditLogger {
 // ============================================================================
 
 export function createAuditLogger(
-  db: Parameters<typeof AuditLogger>[0],
+  db: PrismaClient,
   service: string
 ): AuditLogger {
-  return new AuditLogger(db, service);
+  return new AuditLogger(db as any, service);
 }
 
 export function createStructuredLogger(

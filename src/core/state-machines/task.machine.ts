@@ -256,7 +256,7 @@ export class TaskStateMachine {
         'TASK',
         this.context.taskId,
         this.status,
-        config?.target || 'UNKNOWN',
+        'UNKNOWN',
         `Event ${event.type} not allowed from state ${this.status}`
       ));
     }

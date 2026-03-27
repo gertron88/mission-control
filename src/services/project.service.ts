@@ -156,14 +156,17 @@ export class ProjectService {
    */
   async createProject(input: CreateProjectInput): Promise<Result<any, Error>> {
     try {
+      const slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      
       const project = await this.deps.prisma.project.create({
         data: {
           portfolioId: input.portfolioId,
           name: input.name,
+          slug,
           charter: input.charter,
           description: input.description,
           objectives: input.objectives,
-          successMetrics: input.successMetrics,
+          successMetrics: input.successMetrics as Prisma.InputJsonValue,
           budgetAllocated: input.budgetAllocated,
           plannedStart: input.plannedStart,
           plannedEnd: input.plannedEnd,
@@ -225,7 +228,7 @@ export class ProjectService {
       if (input.name !== undefined) updateData.name = input.name;
       if (input.charter !== undefined) updateData.charter = input.charter;
       if (input.description !== undefined) updateData.description = input.description;
-      if (input.objectives !== undefined) updateData.objectives = input.objectives;
+      if (input.objectives !== undefined) updateData.objectives = input.objectives as Prisma.InputJsonValue;
       if (input.budgetAllocated !== undefined) updateData.budgetAllocated = input.budgetAllocated;
       if (input.actualStart !== undefined) updateData.actualStart = input.actualStart;
       if (input.actualEnd !== undefined) updateData.actualEnd = input.actualEnd;
@@ -467,7 +470,6 @@ export class ProjectService {
             action: 'TASK_STATUS_CHANGED',
             resourceType: 'Task',
             resourceId: task.id,
-            metadata: { reason: 'Dependencies resolved', from: task.status, to: 'READY' },
           });
         }
       }

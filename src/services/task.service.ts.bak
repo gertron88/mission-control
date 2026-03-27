@@ -125,6 +125,7 @@ export class TaskService {
               assignee: { select: { handle: true } }
             },
           },
+          dependents: { select: { id: true, number: true, title: true, status: true } },
           comments: { orderBy: { createdAt: 'asc' } },
           attachments: true,
           timeLogs: { orderBy: { startedAt: 'desc' }, take: 10 },
@@ -365,7 +366,7 @@ export class TaskService {
       if (input.priority !== undefined) updateData.priority = input.priority;
       if (input.estimatedEffort !== undefined) updateData.estimatedEffort = input.estimatedEffort;
       if (input.actualEffort !== undefined) updateData.actualEffort = input.actualEffort;
-      if (input.actualOutputs !== undefined) updateData.actualOutputs = input.actualOutputs as Prisma.InputJsonValue;
+      if (input.actualOutputs !== undefined) updateData.actualOutputs = input.actualOutputs;
       if (input.retryCount !== undefined) updateData.retryCount = input.retryCount;
       if (input.dueDate !== undefined) updateData.dueDate = input.dueDate;
 
@@ -405,7 +406,7 @@ export class TaskService {
           if (!assignee) {
             return Result.err(new Error('Assignee not found'));
           }
-          updateData.assignee = { connect: { id: input.assigneeId } };
+          updateData.assigneeId = input.assigneeId;
           updateData.assignedAt = new Date();
           
           statusHistory.push({
@@ -415,7 +416,7 @@ export class TaskService {
             reason: `Assigned to ${assignee.handle}`,
           });
         } else {
-          updateData.assignee = { disconnect: true };
+          updateData.assigneeId = null;
         }
       }
 
@@ -470,7 +471,7 @@ export class TaskService {
       }
 
       const actor = await this.deps.prisma.agent.findUnique({ where: { id: actorId } });
-      if (task.createdBy !== actorId && actor?.role !== 'COORDINATOR') {
+      if (task.creatorId !== actorId && actor?.role !== 'COORDINATOR') {
         return Result.err(new Error('Only creator or coordinator can delete'));
       }
 
@@ -533,7 +534,7 @@ export class TaskService {
         where: { id: input.taskId },
         data: {
           status: 'BLOCKED',
-          blockerType: input.blockerType as BlockerType,
+          blockerType: input.blockerType,
           blockerReason: input.reason,
           statusHistory,
         },

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { AuditSeverity, ActorType } from '@prisma/client'
+import { AuditSeverity, ActorType, Prisma } from '@prisma/client'
 
 interface AuditLogInput {
   actorType: ActorType
@@ -20,6 +20,8 @@ export async function logAction(input: AuditLogInput) {
     data: {
       ...input,
       severity: input.severity ?? AuditSeverity.INFO,
+      beforeState: input.beforeState as Prisma.InputJsonValue | undefined,
+      afterState: input.afterState as Prisma.InputJsonValue | undefined,
     },
   })
 }
