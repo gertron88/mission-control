@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { StatusCard } from "@/components/status/StatusCard";
 import { SectionCard } from "@/components/layout/SectionCard";
