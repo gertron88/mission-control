@@ -1,7 +1,6 @@
-import { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { Providers } from './providers'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -16,9 +15,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Providers>{children}</Providers>
+    <html lang="en" className="dark">
+      <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" />
+      </head>
+      <body className={`${inter.className} bg-slate-950 text-slate-200`}>
+        {children}
       </body>
     </html>
   )
