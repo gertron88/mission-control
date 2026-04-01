@@ -16,9 +16,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <head>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" />
-      </head>
       <body className={`${inter.className} bg-slate-950 text-slate-200`}>
         {children}
       </body>

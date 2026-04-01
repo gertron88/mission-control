@@ -3,24 +3,34 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { 
+  LayoutDashboard, 
+  FolderKanban, 
+  CheckSquare, 
+  Bot,
+  Remote,
+  Menu,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 
 interface NavItem {
   path: string;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   badge?: string | number;
   badgeColor?: string;
 }
 
 const navItems: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: 'ri-layout-masonry-line' },
-  { path: '/projects', label: 'Projects', icon: 'ri-folder-chart-line', badge: 9 },
-  { path: '/tasks', label: 'Tasks', icon: 'ri-task-line', badge: 3, badgeColor: 'bg-red-500' },
-  { path: '/agents', label: 'Agents', icon: 'ri-robot-2-line', badge: 10 },
+  { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+  { path: '/projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, badge: 9 },
+  { path: '/tasks', label: 'Tasks', icon: <CheckSquare className="w-4 h-4" />, badge: 3, badgeColor: 'bg-red-500' },
+  { path: '/agents', label: 'Agents', icon: <Bot className="w-4 h-4" />, badge: 10 },
 ];
 
 const bottomNavItems: NavItem[] = [
-  { path: '/operations', label: 'Operations', icon: 'ri-remote-control-line' },
+  { path: '/operations', label: 'Operations', icon: <Remote className="w-4 h-4" /> },
 ];
 
 const systemStatus = [
@@ -47,13 +57,13 @@ export default function Sidebar() {
       <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800/60">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center bg-cyan-500/20 border border-cyan-500/30">
-            <i className="ri-dashboard-3-line text-cyan-400 text-lg"></i>
+            <LayoutDashboard className="w-5 h-5 text-cyan-400" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
               <span className="font-bold text-sm tracking-wide text-white whitespace-nowrap">Mission Control</span>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="live-dot relative w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                <span className="relative w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
                 <span className="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">LIVE</span>
               </div>
             </div>
@@ -63,7 +73,7 @@ export default function Sidebar() {
           onClick={() => setCollapsed(!collapsed)}
           className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-200 cursor-pointer flex-shrink-0 transition-colors"
         >
-          <i className={`${collapsed ? 'ri-arrow-right-s-line' : 'ri-arrow-left-s-line'} text-base`}></i>
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
       </div>
 
@@ -86,8 +96,8 @@ export default function Sidebar() {
                   : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent'
               }`}
             >
-              <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                <i className={`${item.icon} text-base ${active ? 'text-cyan-400' : ''}`}></i>
+              <div className={`w-4 h-4 flex items-center justify-center flex-shrink-0 ${active ? 'text-cyan-400' : ''}`}>
+                {item.icon}
               </div>
               {!collapsed && (
                 <>
@@ -114,7 +124,7 @@ export default function Sidebar() {
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 border border-transparent cursor-not-allowed opacity-50 whitespace-nowrap"
           >
             <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-              <i className={`${item.icon} text-base`}></i>
+              {item.icon}
             </div>
             {!collapsed && (
               <>

@@ -2,6 +2,7 @@
 
 import { ReactNode, useState, useEffect } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
+import { Clock, Bell, Settings } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -35,21 +36,19 @@ export default function DashboardLayout({ children, title, subtitle, actions }: 
             {actions}
             {/* Clock */}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700/50 bg-slate-800/40">
-              <div className="w-4 h-4 flex items-center justify-center">
-                <i className="ri-time-line text-slate-400 text-sm"></i>
-              </div>
+              <Clock className="w-4 h-4 text-slate-400" />
               <span className="text-xs font-mono text-slate-300">
                 {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
               </span>
             </div>
             {/* Notifications */}
             <button className="relative w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700/50 bg-slate-800/40 text-slate-400 hover:text-slate-200 hover:border-slate-600/70 transition-all cursor-pointer">
-              <i className="ri-notification-3-line text-sm"></i>
+              <Bell className="w-4 h-4" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">3</span>
             </button>
             {/* Settings */}
             <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700/50 bg-slate-800/40 text-slate-400 hover:text-slate-200 hover:border-slate-600/70 transition-all cursor-pointer">
-              <i className="ri-settings-4-line text-sm"></i>
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import { Bot, Timer, CheckCircle, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
+
 interface StatusCard {
   id: string;
   label: string;
@@ -5,7 +7,7 @@ interface StatusCard {
   subValue: string;
   change: string;
   trend: 'up' | 'down';
-  icon: string;
+  icon: React.ReactNode;
   bgGradient: string;
   borderColor: string;
   textColor: string;
@@ -19,7 +21,7 @@ const statusCards: StatusCard[] = [
     subValue: '2 deploying',
     change: '+2',
     trend: 'up',
-    icon: 'ri-robot-2-line',
+    icon: <Bot className="w-5 h-5" />,
     bgGradient: 'from-cyan-500/10 to-cyan-500/5',
     borderColor: 'border-cyan-500/30',
     textColor: 'text-cyan-400',
@@ -31,7 +33,7 @@ const statusCards: StatusCard[] = [
     subValue: '12 high priority',
     change: '+8',
     trend: 'up',
-    icon: 'ri-timer-2-line',
+    icon: <Timer className="w-5 h-5" />,
     bgGradient: 'from-amber-500/10 to-amber-500/5',
     borderColor: 'border-amber-500/30',
     textColor: 'text-amber-400',
@@ -43,7 +45,7 @@ const statusCards: StatusCard[] = [
     subValue: 'vs 18 yesterday',
     change: '+5',
     trend: 'up',
-    icon: 'ri-checkbox-circle-line',
+    icon: <CheckCircle className="w-5 h-5" />,
     bgGradient: 'from-emerald-500/10 to-emerald-500/5',
     borderColor: 'border-emerald-500/30',
     textColor: 'text-emerald-400',
@@ -55,7 +57,7 @@ const statusCards: StatusCard[] = [
     subValue: '1 critical',
     change: '-1',
     trend: 'down',
-    icon: 'ri-error-warning-line',
+    icon: <AlertTriangle className="w-5 h-5" />,
     bgGradient: 'from-red-500/10 to-red-500/5',
     borderColor: 'border-red-500/30',
     textColor: 'text-red-400',
@@ -76,15 +78,15 @@ export default function StatusCards() {
           ></div>
 
           <div className="flex items-start justify-between mb-4">
-            <div className={`w-10 h-10 flex items-center justify-center rounded-xl border ${card.borderColor} bg-slate-900/50`}>
-              <i className={`${card.icon} text-xl ${card.textColor}`}></i>
+            <div className={`w-10 h-10 flex items-center justify-center rounded-xl border ${card.borderColor} bg-slate-900/50 ${card.textColor}`}>
+              {card.icon}
             </div>
             <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold
               ${card.trend === 'up'
                 ? card.id === 'blocked' ? 'bg-red-500/15 text-red-400' : 'bg-emerald-500/15 text-emerald-400'
                 : 'bg-emerald-500/15 text-emerald-400'
               }`}>
-              <i className={card.trend === 'up' ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'}></i>
+              {card.trend === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
               {card.change}
             </div>
           </div>
