@@ -20,40 +20,50 @@ export default function DashboardLayout({ children, title, subtitle, actions }: 
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex">
+    <div style={{ minHeight: '100vh', background: '#020617', display: 'flex' }}>
       <Sidebar />
-      <div className="flex-1 ml-64 min-w-0 transition-all duration-300">
+      <div style={{ flex: 1, marginLeft: '256px', minWidth: 0, transition: 'margin 0.3s' }}>
         {/* Topbar */}
         <div
-          className="sticky top-0 z-20 flex items-center justify-between px-6 py-3.5 border-b border-slate-800/60"
-          style={{ background: 'rgba(10, 17, 32, 0.95)', backdropFilter: 'blur(12px)' }}
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 24px',
+            borderBottom: '1px solid rgba(51, 65, 85, 0.6)',
+            background: 'rgba(10, 17, 32, 0.95)',
+            backdropFilter: 'blur(12px)',
+          }}
         >
           <div>
-            <h1 className="text-base font-semibold text-white tracking-wide">{title}</h1>
-            {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+            <h1 style={{ fontSize: '16px', fontWeight: 600, color: 'white', letterSpacing: '0.025em' }}>{title}</h1>
+            {subtitle && <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{subtitle}</p>}
           </div>
-          <div className="flex items-center gap-4">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {actions}
             {/* Clock */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700/50 bg-slate-800/40">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <span className="text-xs font-mono text-slate-300">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(71, 85, 105, 0.5)', background: 'rgba(30, 41, 59, 0.4)' }}>
+              <Clock className="w-4 h-4" style={{ color: '#94a3b8' }} />
+              <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#cbd5e1' }}>
                 {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
               </span>
             </div>
             {/* Notifications */}
-            <button className="relative w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700/50 bg-slate-800/40 text-slate-400 hover:text-slate-200 hover:border-slate-600/70 transition-all cursor-pointer">
+            <button style={{ position: 'relative', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: '1px solid rgba(71, 85, 105, 0.5)', background: 'rgba(30, 41, 59, 0.4)', color: '#94a3b8', cursor: 'pointer' }}>
               <Bell className="w-4 h-4" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">3</span>
+              <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '16px', height: '16px', borderRadius: '50%', background: '#ef4444', fontSize: '9px', fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
             </button>
             {/* Settings */}
-            <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700/50 bg-slate-800/40 text-slate-400 hover:text-slate-200 hover:border-slate-600/70 transition-all cursor-pointer">
+            <button style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: '1px solid rgba(71, 85, 105, 0.5)', background: 'rgba(30, 41, 59, 0.4)', color: '#94a3b8', cursor: 'pointer' }}>
               <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>
         {/* Content */}
-        <main className="p-6 animate-fade-in">
+        <main style={{ padding: '24px' }}>
           {children}
         </main>
       </div>

@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -9,7 +7,6 @@ import {
   CheckSquare, 
   Bot,
   Cpu,
-  Menu,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -50,37 +47,58 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-full z-30 flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}
-      style={{ background: 'rgba(10, 17, 32, 0.98)', borderRight: '1px solid rgba(51, 65, 85, 0.5)' }}
+      style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        height: '100%',
+        zIndex: 30,
+        display: 'flex',
+        flexDirection: 'column',
+        width: collapsed ? '64px' : '256px',
+        background: 'rgba(10, 17, 32, 0.98)',
+        borderRight: '1px solid rgba(51, 65, 85, 0.5)',
+        transition: 'width 0.3s',
+      }}
     >
       {/* Logo */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800/60">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 flex-shrink-0 rounded-lg overflow-hidden flex items-center justify-center bg-cyan-500/20 border border-cyan-500/30">
-            <LayoutDashboard className="w-5 h-5 text-cyan-400" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid rgba(30, 41, 59, 0.6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+          <div style={{ 
+            width: '32px', 
+            height: '32px', 
+            flexShrink: 0, 
+            borderRadius: '8px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            background: 'rgba(6, 182, 212, 0.2)', 
+            border: '1px solid rgba(6, 182, 212, 0.3)' 
+          }}>
+            <LayoutDashboard className="w-5 h-5" style={{ color: '#22d3ee' }} />
           </div>
           {!collapsed && (
-            <div className="min-w-0">
-              <span className="font-bold text-sm tracking-wide text-white whitespace-nowrap">Mission Control</span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="relative w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                <span className="text-[10px] text-emerald-400 font-mono uppercase tracking-widest">LIVE</span>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '0.025em', color: 'white', whiteSpace: 'nowrap' }}>Mission Control</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34d399' }}></span>
+                <span style={{ fontSize: '10px', color: '#34d399', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>LIVE</span>
               </div>
             </div>
           )}
         </div>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-200 cursor-pointer flex-shrink-0 transition-colors"
+          style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', cursor: 'pointer', border: 'none', background: 'transparent' }}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
       </div>
 
       {/* Main nav */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+      <nav style={{ flex: 1, padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
         {!collapsed && (
-          <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold px-3 mb-3">
+          <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', fontWeight: 600, paddingLeft: '12px', marginBottom: '12px' }}>
             Command Center
           </p>
         )}
@@ -90,20 +108,36 @@ export default function Sidebar() {
             <Link
               key={item.path}
               href={item.path}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer group whitespace-nowrap ${
-                active
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent'
-              }`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+                border: active ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid transparent',
+                background: active ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+                color: active ? '#67e8f9' : '#94a3b8',
+              }}
             >
-              <div className={`w-4 h-4 flex items-center justify-center flex-shrink-0 ${active ? 'text-cyan-400' : ''}`}>
+              <div style={{ width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {item.icon}
               </div>
               {!collapsed && (
                 <>
-                  <span className="flex-1 text-sm">{item.label}</span>
+                  <span style={{ flex: 1 }}>{item.label}</span>
                   {item.badge !== undefined && (
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${item.badgeColor || 'bg-slate-700 text-slate-300'} text-white`}>
+                    <span style={{ 
+                      fontSize: '10px', 
+                      fontFamily: 'monospace', 
+                      padding: '2px 6px', 
+                      borderRadius: '9999px', 
+                      background: item.badgeColor || '#475569',
+                      color: 'white'
+                    }}>
                       {item.badge}
                     </span>
                   )}
@@ -114,22 +148,34 @@ export default function Sidebar() {
         })}
 
         {!collapsed && (
-          <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold px-3 mt-6 mb-3">
+          <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', fontWeight: 600, paddingLeft: '12px', marginTop: '24px', marginBottom: '12px' }}>
             Infrastructure
           </p>
         )}
         {bottomNavItems.map((item) => (
           <div
             key={item.path}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 border border-transparent cursor-not-allowed opacity-50 whitespace-nowrap"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '10px 12px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#64748b',
+              border: '1px solid transparent',
+              cursor: 'not-allowed',
+              opacity: 0.5,
+            }}
           >
-            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+            <div style={{ width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {item.icon}
             </div>
             {!collapsed && (
               <>
-                <span className="flex-1 text-sm">{item.label}</span>
-                <span className="text-[9px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider">
+                <span style={{ flex: 1 }}>{item.label}</span>
+                <span style={{ fontSize: '9px', background: 'rgba(71, 85, 105, 0.5)', color: '#64748b', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Soon
                 </span>
               </>
@@ -140,25 +186,17 @@ export default function Sidebar() {
 
       {/* System status */}
       {!collapsed && (
-        <div className="px-3 py-4 border-t border-slate-800/60">
-          <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold mb-2.5">
+        <div style={{ padding: '12px', borderTop: '1px solid rgba(30, 41, 59, 0.6)' }}>
+          <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748b', fontWeight: 600, marginBottom: '10px' }}>
             System Status
           </p>
-          <div className="space-y-1.5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {systemStatus.map((sys) => (
-              <div key={sys.label} className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">{sys.label}</span>
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      sys.status === 'online' ? 'bg-emerald-400' : 'bg-amber-400'
-                    }`}
-                  ></div>
-                  <span
-                    className={`text-[10px] font-mono uppercase ${
-                      sys.status === 'online' ? 'text-emerald-400' : 'text-amber-400'
-                    }`}
-                  >
+              <div key={sys.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>{sys.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: sys.status === 'online' ? '#34d399' : '#fbbf24' }}></div>
+                  <span style={{ fontSize: '10px', fontFamily: 'monospace', textTransform: 'uppercase', color: sys.status === 'online' ? '#34d399' : '#fbbf24' }}>
                     {sys.status}
                   </span>
                 </div>
@@ -169,14 +207,14 @@ export default function Sidebar() {
       )}
 
       {/* User */}
-      <div className={`px-3 py-3 border-t border-slate-800/60 flex items-center gap-2.5 ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-          <span className="text-[10px] font-bold text-white">MC</span>
+      <div style={{ padding: '12px', borderTop: '1px solid rgba(30, 41, 59, 0.6)', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: collapsed ? 'center' : 'flex-start' }}>
+        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #06b6d4, #9333ea)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: 'white' }}>MC</span>
         </div>
         {!collapsed && (
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-200 truncate">Mission Control</p>
-            <p className="text-[10px] text-slate-500 truncate">Admin</p>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Mission Control</p>
+            <p style={{ fontSize: '10px', color: '#64748b' }}>Admin</p>
           </div>
         )}
       </div>
