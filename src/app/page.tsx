@@ -15,12 +15,12 @@ export default function HomePage() {
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
         {/* Activity feed - 2 cols */}
-        <div className="lg:col-span-2 glass-card p-5">
+        <div className="lg:col-span-2 bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-xl p-5">
           <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-4">Activity Feed</h3>
           <p className="text-sm text-slate-500">Activity feed coming soon...</p>
         </div>
         {/* Agent grid - 1 col */}
-        <div className="glass-card p-5">
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-xl p-5">
           <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-4">Agent Status</h3>
           <p className="text-sm text-slate-500">Agent status coming soon...</p>
         </div>
@@ -29,7 +29,7 @@ export default function HomePage() {
       {/* Bottom metrics row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
         {/* Throughput */}
-        <div className="glass-card p-5">
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Task Throughput</h3>
             <span className="text-[10px] font-mono text-slate-500">Last 24h</span>
@@ -51,7 +51,7 @@ export default function HomePage() {
         </div>
 
         {/* Success rate */}
-        <div className="glass-card p-5">
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Success Rate</h3>
             <span className="text-[10px] font-mono text-slate-500">7-day avg</span>
@@ -84,7 +84,7 @@ export default function HomePage() {
         </div>
 
         {/* Budget usage */}
-        <div className="glass-card p-5">
+        <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Budget Usage</h3>
             <span className="text-[10px] font-mono text-amber-400">Apr 2026</span>
@@ -105,7 +105,7 @@ export default function HomePage() {
                     className={`h-full ${item.color} rounded-full relative overflow-hidden`}
                     style={{ width: `${item.used}%` }}
                   >
-                    <div className="progress-bar-shimmer absolute inset-0"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_linear_infinite]" style={{ backgroundSize: '200% 100%' }}></div>
                   </div>
                 </div>
               </div>

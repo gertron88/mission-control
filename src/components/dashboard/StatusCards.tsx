@@ -70,7 +70,7 @@ export default function StatusCards() {
       {statusCards.map((card) => (
         <div
           key={card.id}
-          className={`glass-card glass-card-hover bg-gradient-to-br ${card.bgGradient} ${card.borderColor} p-5 relative overflow-hidden cursor-pointer border`}
+          className={`bg-slate-800/50 backdrop-blur-md border ${card.borderColor} rounded-xl p-5 relative overflow-hidden cursor-pointer transition-all duration-200 hover:bg-slate-800/70 hover:-translate-y-0.5 bg-gradient-to-br ${card.bgGradient}`}
         >
           {/* Background decoration */}
           <div className={`absolute -right-4 -top-4 w-20 h-20 rounded-full ${card.textColor} opacity-5`}
