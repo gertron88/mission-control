@@ -8,7 +8,7 @@ import {
   FolderKanban, 
   CheckSquare, 
   Bot,
-  Remote,
+  Cpu,
   Menu,
   ChevronLeft,
   ChevronRight
@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
 ];
 
 const bottomNavItems: NavItem[] = [
-  { path: '/operations', label: 'Operations', icon: <Remote className="w-4 h-4" /> },
+  { path: '/operations', label: 'Operations', icon: <Cpu className="w-4 h-4" /> },
 ];
 
 const systemStatus = [
