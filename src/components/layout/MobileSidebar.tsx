@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Menu } from "lucide-react";
-import { Sidebar } from "./Sidebar";
+import Sidebar from "./Sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
