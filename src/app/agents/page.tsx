@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Bot, Activity, Cpu, Zap, Search, Plus } from 'lucide-react';
+import { Bot, Activity, Cpu, Zap, Search, Plus, Download, Copy, Check } from 'lucide-react';
 
 interface Agent {
   id: string;
@@ -114,6 +114,178 @@ const statusConfig: Record<string, { color: string; bg: string; pulse: boolean }
   ERROR: { color: '#f87171', bg: 'rgba(239, 68, 68, 0.15)', pulse: false },
 };
 
+// SDK Download Component
+function SDKDownloadPanel() {
+  const [copied, setCopied] = useState(false);
+  
+  const installCommand = 'npm install @mission-control/agent-client';
+  
+  const exampleCode = `const { MissionControlAgent } = require('@mission-control/agent-client');
+
+const agent = new MissionControlAgent({
+  missionControlUrl: 'https://mission-control-sage-mu.vercel.app',
+  apiKey: 'your-api-key-here',
+});
+
+await agent.connect();
+
+agent.onTask(async (task) => {
+  console.log('Received task:', task);
+  
+  // Do work...
+  const result = await doWork(task);
+  
+  // Report completion
+  await agent.completeTask(task.id, result);
+});
+
+agent.onKill(() => {
+  console.log('Kill switch activated!');
+  process.exit(0);
+});`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(exampleCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadSDK = () => {
+    const link = document.createElement('a');
+    link.href = '/agent-sdk/mission-control-agent.js';
+    link.download = 'mission-control-agent.js';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div style={{
+      background: 'rgba(6, 182, 212, 0.1)',
+      border: '1px solid rgba(6, 182, 212, 0.3)',
+      borderRadius: '12px',
+      padding: '20px',
+      marginBottom: '24px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '10px',
+          background: 'rgba(6, 182, 212, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <Download className="w-5 h-5" style={{ color: '#22d3ee' }} />
+        </div>
+        <div>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#e2e8f0' }}>Agent SDK</h3>
+          <p style={{ fontSize: '12px', color: '#94a3b8' }}>Connect your agents via WebSocket</p>
+        </div>
+      </div>
+
+      <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '16px', lineHeight: 1.5 }}>
+        Download the Mission Control Agent SDK to connect your autonomous agents. 
+        Features real-time task delivery, progress reporting, and kill switch support.
+      </p>
+
+      {/* Install command */}
+      <div style={{ marginBottom: '16px' }}>
+        <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Install via npm</p>
+        <div style={{
+          background: '#0f172a',
+          borderRadius: '8px',
+          padding: '12px',
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#22d3ee',
+        }}>
+          {installCommand}
+        </div>
+      </div>
+
+      {/* Example code */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <p style={{ fontSize: '11px', color: '#64748b' }}>Quick Start</p>
+          <button
+            onClick={copyToClipboard}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '11px',
+              color: copied ? '#34d399' : '#64748b',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <div style={{
+          background: '#0f172a',
+          borderRadius: '8px',
+          padding: '12px',
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#94a3b8',
+          maxHeight: '150px',
+          overflow: 'auto',
+          whiteSpace: 'pre-wrap',
+        }}>
+          {exampleCode}
+        </div>
+      </div>
+
+      {/* Download button */}
+      <div style={{ display: 'flex', gap: '12px' }}>
+        <button
+          onClick={downloadSDK}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            borderRadius: '8px',
+            background: 'rgba(6, 182, 212, 0.15)',
+            border: '1px solid rgba(6, 182, 212, 0.3)',
+            color: '#67e8f9',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <Download className="w-4 h-4" />
+          Download SDK
+        </button>
+        <a
+          href="/agent-sdk/README.md"
+          download
+          style={{
+            padding: '10px 16px',
+            borderRadius: '8px',
+            background: 'rgba(71, 85, 105, 0.3)',
+            border: '1px solid rgba(71, 85, 105, 0.5)',
+            color: '#94a3b8',
+            fontSize: '13px',
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          Docs
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function AgentsPage() {
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
@@ -150,6 +322,9 @@ export default function AgentsPage() {
         </button>
       }
     >
+      {/* SDK Download Panel */}
+      <SDKDownloadPanel />
+
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {[
@@ -170,6 +345,7 @@ export default function AgentsPage() {
         ))}
       </div>
 
+      {/* Rest of the agents page... */}
       {/* Filters + Search */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div style={{ 
