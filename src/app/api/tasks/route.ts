@@ -14,13 +14,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { getServices } from '@/services';
+import { createServices, getServices } from '@/services';
 import { authenticateAgent, successResponse, ApiError, withErrorHandler } from '@/lib/api-utils';
 import { TaskStatus, TaskPriority, TaskType } from '@prisma/client';
 import { DomainError } from '@/types/domain';
 
 // Force dynamic rendering for API route
 export const dynamic = 'force-dynamic'
+
+// Initialize services
+let servicesInitialized = false;
+async function ensureServices() {
+  if (!servicesInitialized) {
+    await createServices(prisma);
+    servicesInitialized = true;
+  }
+}
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -61,6 +70,8 @@ const updateTaskSchema = z.object({
 // ============================================================================
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
+  await ensureServices();
+  
   const { searchParams } = new URL(request.url);
   
   // Build filters
@@ -114,6 +125,8 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 // ============================================================================
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
+  await ensureServices();
+  
   const body = await request.json();
   const validated = createTaskSchema.parse(body);
   
