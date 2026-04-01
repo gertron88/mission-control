@@ -6,6 +6,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { TaskService } from './task.service';
 import { ProjectService } from './project.service';
 import { AgentService } from './agent.service';
@@ -33,46 +34,59 @@ export interface Services {
 // ============================================================================
 
 let servicesInstance: Services | null = null;
+let isInitializing = false;
 
 /**
  * Create all services with shared dependencies
  */
-export function createServices(prisma: PrismaClient): Services {
+export function createServices(prismaClient: PrismaClient): Services {
   // Use singleton pattern for services
   if (servicesInstance) {
     return servicesInstance;
   }
 
-  const task = new TaskService({ prisma });
-  const project = new ProjectService({ prisma });
-  const agent = new AgentService({ prisma });
-  const dependency = new DependencyService({ prisma });
-  const dispatch = new DispatchService({ prisma });
-  const escalation = new EscalationService({ prisma });
-  const notification = new NotificationService({ prisma });
+  // Prevent re-entrant initialization
+  if (isInitializing) {
+    throw new Error('Services are currently being initialized. Avoid circular dependencies.');
+  }
 
-  servicesInstance = {
-    task,
-    project,
-    agent,
-    dependency,
-    dispatch,
-    escalation,
-    notification
-  };
+  isInitializing = true;
 
-  return servicesInstance;
+  try {
+    const task = new TaskService({ prisma: prismaClient });
+    const project = new ProjectService({ prisma: prismaClient });
+    const agent = new AgentService({ prisma: prismaClient });
+    const dependency = new DependencyService({ prisma: prismaClient });
+    const dispatch = new DispatchService({ prisma: prismaClient });
+    const escalation = new EscalationService({ prisma: prismaClient });
+    const notification = new NotificationService({ prisma: prismaClient });
+
+    servicesInstance = {
+      task,
+      project,
+      agent,
+      dependency,
+      dispatch,
+      escalation,
+      notification
+    };
+
+    return servicesInstance;
+  } finally {
+    isInitializing = false;
+  }
 }
 
 /**
  * Get existing services instance
- * Throws if services haven't been initialized
+ * Lazy-initializes if not already created
  */
 export function getServices(): Services {
   if (!servicesInstance) {
-    throw new Error('Services not initialized. Call createServices(prisma) first.');
+    // Auto-initialize with the global prisma instance
+    createServices(prisma);
   }
-  return servicesInstance;
+  return servicesInstance!;
 }
 
 /**
