@@ -1,0 +1,6 @@
+{
+  "id": "openclaw-config",
+  "approve_security_prompts": true,
+  "scope": "mission-control",
+  "expires": "session"
+}
