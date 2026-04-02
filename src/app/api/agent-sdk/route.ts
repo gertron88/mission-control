@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
+// The Agent SDK code as a string
+// This is the code that agents will download and execute
 const AGENT_SDK_CODE = `'use strict';
 
 /**
@@ -44,9 +46,6 @@ class MissionControlAgent {
     this.agentId = null;
   }
 
-  /**
-   * Connect to Mission Control via WebSocket
-   */
   async connect() {
     return new Promise((resolve, reject) => {
       const wsUrl = this.config.missionControlUrl.replace('https://', 'wss://').replace('http://', 'ws://');
@@ -60,10 +59,9 @@ class MissionControlAgent {
       });
 
       this.ws.on('open', () => {
-        console.log('[Agent SDK] Connected to Mission Control');
+        console.log('[Agent SDK] Connected');
         this.connected = true;
         
-        // Register agent
         this.send({
           type: 'REGISTER',
           payload: {
@@ -74,9 +72,7 @@ class MissionControlAgent {
           }
         });
         
-        // Start heartbeat
         this.startHeartbeat();
-        
         resolve();
       });
 
@@ -85,170 +81,92 @@ class MissionControlAgent {
           const message = JSON.parse(data);
           this.handleMessage(message);
         } catch (err) {
-          console.error('[Agent SDK] Failed to parse message:', err);
+          console.error('[Agent SDK] Parse error:', err);
         }
       });
 
       this.ws.on('close', () => {
-        console.log('[Agent SDK] Disconnected from Mission Control');
+        console.log('[Agent SDK] Disconnected');
         this.connected = false;
         this.stopHeartbeat();
         this.scheduleReconnect();
       });
 
       this.ws.on('error', (err) => {
-        console.error('[Agent SDK] WebSocket error:', err);
+        console.error('[Agent SDK] Error:', err);
         reject(err);
       });
     });
   }
 
-  /**
-   * Send message to Mission Control
-   */
   send(message) {
     if (this.ws && this.connected) {
       this.ws.send(JSON.stringify(message));
     }
   }
 
-  /**
-   * Handle incoming messages
-   */
   handleMessage(message) {
     switch (message.type) {
       case 'REGISTERED':
         this.agentId = message.payload.agentId;
-        console.log('[Agent SDK] Registered as agent:', this.agentId);
+        console.log('[Agent SDK] Registered:', this.agentId);
         break;
-        
       case 'TASK_ASSIGNED':
         this.handleTask(message.payload);
         break;
-        
       case 'KILL_SWITCH':
-        console.log('[Agent SDK] Kill switch activated');
-        if (this.killHandler) {
-          this.killHandler();
-        }
+        console.log('[Agent SDK] Kill switch');
+        if (this.killHandler) this.killHandler();
         this.disconnect();
         process.exit(0);
         break;
-        
-      case 'HEARTBEAT_ACK':
-        // Heartbeat acknowledged
-        break;
-        
-      default:
-        console.log('[Agent SDK] Unknown message type:', message.type);
     }
   }
 
-  /**
-   * Handle assigned task
-   */
   async handleTask(task) {
-    console.log('[Agent SDK] Task assigned:', task.id, task.title);
+    this.send({ type: 'TASK_ACK', payload: { taskId: task.id } });
     
-    // Acknowledge task receipt
-    this.send({
-      type: 'TASK_ACK',
-      payload: { taskId: task.id }
-    });
-
-    // Find handler for task type
     const handler = this.taskHandlers.get(task.type) || this.taskHandlers.get('default');
-    
     if (!handler) {
-      console.error('[Agent SDK] No handler for task type:', task.type);
-      this.failTask(task.id, 'No handler registered for task type');
+      this.failTask(task.id, 'No handler');
       return;
     }
 
     try {
-      // Report task started
-      this.send({
-        type: 'TASK_STARTED',
-        payload: { taskId: task.id, timestamp: new Date().toISOString() }
-      });
-
-      // Execute task
+      this.send({ type: 'TASK_STARTED', payload: { taskId: task.id, timestamp: new Date().toISOString() } });
       const result = await handler(task);
-      
-      // Report completion
       this.completeTask(task.id, result);
     } catch (err) {
-      console.error('[Agent SDK] Task failed:', err);
       this.failTask(task.id, err.message);
     }
   }
 
-  /**
-   * Register task handler
-   */
   onTask(typeOrHandler, handler) {
     if (typeof typeOrHandler === 'function') {
-      // Default handler
       this.taskHandlers.set('default', typeOrHandler);
     } else {
-      // Type-specific handler
       this.taskHandlers.set(typeOrHandler, handler);
     }
   }
 
-  /**
-   * Register kill switch handler
-   */
   onKill(handler) {
     this.killHandler = handler;
   }
 
-  /**
-   * Report task completion
-   */
   completeTask(taskId, result) {
     this.send({
       type: 'TASK_COMPLETE',
-      payload: {
-        taskId,
-        result: result || {},
-        timestamp: new Date().toISOString()
-      }
+      payload: { taskId, result: result || {}, timestamp: new Date().toISOString() }
     });
   }
 
-  /**
-   * Report task failure
-   */
   failTask(taskId, error) {
     this.send({
       type: 'TASK_FAILED',
-      payload: {
-        taskId,
-        error: typeof error === 'string' ? error : error.message,
-        timestamp: new Date().toISOString()
-      }
+      payload: { taskId, error: typeof error === 'string' ? error : error.message, timestamp: new Date().toISOString() }
     });
   }
 
-  /**
-   * Report task progress
-   */
-  reportProgress(taskId, progress, message) {
-    this.send({
-      type: 'TASK_PROGRESS',
-      payload: {
-        taskId,
-        progress: Math.min(100, Math.max(0, progress)),
-        message,
-        timestamp: new Date().toISOString()
-      }
-    });
-  }
-
-  /**
-   * Start heartbeat
-   */
   startHeartbeat() {
     this.heartbeatTimer = setInterval(() => {
       if (this.connected) {
@@ -264,9 +182,6 @@ class MissionControlAgent {
     }, this.config.heartbeatInterval);
   }
 
-  /**
-   * Stop heartbeat
-   */
   stopHeartbeat() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
@@ -274,61 +189,35 @@ class MissionControlAgent {
     }
   }
 
-  /**
-   * Schedule reconnection
-   */
   scheduleReconnect() {
-    console.log('[Agent SDK] Reconnecting in 5 seconds...');
-    this.reconnectTimer = setTimeout(() => {
-      this.connect().catch(err => {
-        console.error('[Agent SDK] Reconnect failed:', err);
-      });
+    setTimeout(() => {
+      this.connect().catch(() => {});
     }, 5000);
   }
 
-  /**
-   * Get CPU usage (placeholder - implement per-platform)
-   */
   getCpuUsage() {
     try {
       const usage = process.cpuUsage();
       return Math.round((usage.user + usage.system) / 1000000);
-    } catch {
-      return 0;
-    }
+    } catch { return 0; }
   }
 
-  /**
-   * Get memory usage
-   */
   getMemoryUsage() {
     try {
       return Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-    } catch {
-      return 0;
-    }
+    } catch { return 0; }
   }
 
-  /**
-   * Disconnect from Mission Control
-   */
   disconnect() {
     this.stopHeartbeat();
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-    }
-    if (this.ws) {
-      this.ws.close();
-    }
+    if (this.ws) this.ws.close();
     this.connected = false;
   }
 }
 
-// CLI mode
 if (require.main === module) {
   const args = process.argv.slice(2);
   const config = {};
-  
   args.forEach(arg => {
     if (arg.startsWith('--')) {
       const [key, value] = arg.slice(2).split('=');
@@ -337,30 +226,26 @@ if (require.main === module) {
   });
 
   const agent = new MissionControlAgent(config);
-  
-  // Default task handler
   agent.onTask(async (task) => {
-    console.log('[Agent] Executing task:', task.title);
-    // Override this with your task logic
+    console.log('[Agent] Task:', task.title);
     return { status: 'completed' };
   });
-  
-  // Kill switch handler
   agent.onKill(() => {
-    console.log('[Agent] Kill switch received, shutting down...');
-  });
-
-  agent.connect().catch(err => {
-    console.error('[Agent] Failed to connect:', err);
-    process.exit(1);
-  });
-
-  // Handle graceful shutdown
-  process.on('SIGINT', () => {
-    console.log('[Agent] Shutting down...');
-    agent.disconnect();
+    console.log('[Agent] Killed');
     process.exit(0);
   });
+  agent.connect().catch(() => process.exit(1));
 }
 
 module.exports = { MissionControlAgent };
+`;
+
+// GET handler - returns the SDK code
+export async function GET(request: NextRequest) {
+  return new NextResponse(AGENT_SDK_CODE, {
+    headers: {
+      'Content-Type': 'application/javascript',
+      'Cache-Control': 'public, max-age=300',
+    },
+  });
+}

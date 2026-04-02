@@ -25,15 +25,14 @@ const bottomNavItems: NavItem[] = [
   { path: '/operations', label: 'Operations', icon: <Cpu className="w-4 h-4" /> },
 ];
 
-const systemStatus = [
-  { label: 'API Gateway', status: 'online' as const },
-  { label: 'Model Inference', status: 'online' as const },
-  { label: 'Vector DB', status: 'degraded' as const },
-];
-
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [counts, setCounts] = useState({ projects: 0, tasks: 0, agents: 0 });
+  const [systemStatus, setSystemStatus] = useState([
+    { label: 'API Gateway', status: 'online' as const },
+    { label: 'Database', status: 'online' as const },
+    { label: 'WebSocket', status: 'online' as const },
+  ]);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -59,7 +58,27 @@ export default function Sidebar() {
       }
     }
 
+    async function fetchSystemStatus() {
+      try {
+        const res = await fetch('/api/health/services');
+        if (res.ok) {
+          const data = await res.json();
+          setSystemStatus(data.slice(0, 3).map((s: any) => ({
+            label: s.name,
+            status: s.status
+          })));
+        }
+      } catch (err) {
+        console.error('Failed to fetch system status:', err);
+      }
+    }
+
     fetchCounts();
+    fetchSystemStatus();
+    
+    // Poll system status every 30 seconds
+    const interval = setInterval(fetchSystemStatus, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const navItems: NavItem[] = [
