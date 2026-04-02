@@ -4,22 +4,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, ChevronRight } from "lucide-react";
 
-// Route name mapping
-const routeNames: Record<string, string> = {
-  "/": "Dashboard",
-  "/projects": "Projects",
-  "/tasks": "Tasks",
-  "/agents": "Agents",
-  "/operations": "Operations",
-  "/trading": "Trading",
-  "/settings": "Settings",
-};
-
 export function Breadcrumb() {
   const pathname = usePathname();
   
   // Get current page name from pathname
-  const currentPageName = routeNames[pathname] || "Unknown";
+  const getPageName = (path: string) => {
+    const names: Record<string, string> = {
+      "/": "Dashboard",
+      "/projects": "Projects",
+      "/tasks": "Tasks",
+      "/agents": "Agents",
+      "/operations": "Operations",
+      "/trading": "Trading",
+      "/settings": "Settings",
+    };
+    return names[path] || "Unknown";
+  };
+  
+  const currentPageName = getPageName(pathname || "");
   
   // Check if we're on the home page
   const isHome = pathname === "/";
