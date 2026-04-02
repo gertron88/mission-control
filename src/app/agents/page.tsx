@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Bot, Activity, Cpu, Zap, Search, Plus, Download, Copy, Check } from 'lucide-react';
 
@@ -11,100 +11,16 @@ interface Agent {
   status: 'ONLINE' | 'BUSY' | 'AWAY' | 'OFFLINE' | 'ERROR';
   role: string;
   capabilities: string[];
-  currentTask: string | null;
-  cpu: number;
-  memory: number;
-  tasksCompleted: number;
-  successRate: number;
-  lastHeartbeat: string;
+  model: string;
+  _count: {
+    assignedTasks: number;
+  };
+  heartbeats: Array<{
+    timestamp: string;
+    cpuPercent?: number;
+    memoryMb?: number;
+  }>;
 }
-
-const agents: Agent[] = [
-  {
-    id: 'a-001',
-    name: 'Atlas-7',
-    handle: '@atlas-7',
-    status: 'BUSY',
-    role: 'Data Engineer',
-    capabilities: ['ETL', 'Vector DB', 'Python'],
-    currentTask: 'Data Pipeline Sync',
-    cpu: 78,
-    memory: 412,
-    tasksCompleted: 234,
-    successRate: 94,
-    lastHeartbeat: '2s ago',
-  },
-  {
-    id: 'a-002',
-    name: 'Nexus-3',
-    handle: '@nexus-3',
-    status: 'BUSY',
-    role: 'Financial Analyst',
-    capabilities: ['Finance', 'NLP', 'SQL'],
-    currentTask: 'Financial Report Aggregation',
-    cpu: 45,
-    memory: 298,
-    tasksCompleted: 189,
-    successRate: 91,
-    lastHeartbeat: '5s ago',
-  },
-  {
-    id: 'a-003',
-    name: 'Cipher-1',
-    handle: '@cipher-1',
-    status: 'ONLINE',
-    role: 'Security Analyst',
-    capabilities: ['Security', 'Compliance', 'Audit'],
-    currentTask: null,
-    cpu: 5,
-    memory: 128,
-    tasksCompleted: 156,
-    successRate: 98,
-    lastHeartbeat: '8s ago',
-  },
-  {
-    id: 'a-004',
-    name: 'Prism-9',
-    handle: '@prism-9',
-    status: 'ONLINE',
-    role: 'ML Engineer',
-    capabilities: ['ML', 'Python', 'PyTorch'],
-    currentTask: null,
-    cpu: 8,
-    memory: 156,
-    tasksCompleted: 312,
-    successRate: 96,
-    lastHeartbeat: '12s ago',
-  },
-  {
-    id: 'a-005',
-    name: 'Vortex-4',
-    handle: '@vortex-4',
-    status: 'ERROR',
-    role: 'CRM Specialist',
-    capabilities: ['CRM', 'Salesforce', 'API'],
-    currentTask: null,
-    cpu: 0,
-    memory: 0,
-    tasksCompleted: 89,
-    successRate: 87,
-    lastHeartbeat: '15m ago',
-  },
-  {
-    id: 'a-006',
-    name: 'Echo-2',
-    handle: '@echo-2',
-    status: 'BUSY',
-    role: 'Research Analyst',
-    capabilities: ['Research', 'Web Scraping', 'NLP'],
-    currentTask: 'Competitive Intel Crawl',
-    cpu: 62,
-    memory: 334,
-    tasksCompleted: 178,
-    successRate: 92,
-    lastHeartbeat: '21s ago',
-  },
-];
 
 const statusConfig: Record<string, { color: string; bg: string; pulse: boolean }> = {
   ONLINE: { color: '#34d399', bg: 'rgba(16, 185, 129, 0.15)', pulse: true },
@@ -287,8 +203,27 @@ agent.onKill(() => {
 }
 
 export default function AgentsPage() {
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    async function fetchAgents() {
+      try {
+        const response = await fetch('/api/agents');
+        if (!response.ok) throw new Error('Failed to fetch agents');
+        const data = await response.json();
+        setAgents(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAgents();
+  }, []);
 
   const filtered = agents.filter((a) => {
     const matchStatus = filter === 'All' || a.status === filter;
@@ -298,6 +233,26 @@ export default function AgentsPage() {
   });
 
   const onlineCount = agents.filter(a => a.status === 'ONLINE' || a.status === 'BUSY').length;
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Agents" subtitle="Loading...">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+          <div style={{ color: '#22d3ee' }}>Loading agents...</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Agents" subtitle="Error">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+          <div style={{ color: '#f87171' }}>Error: {error}</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
@@ -331,7 +286,7 @@ export default function AgentsPage() {
           { label: 'Online', value: agents.filter(a => a.status === 'ONLINE').length, color: '#34d399' },
           { label: 'Busy', value: agents.filter(a => a.status === 'BUSY').length, color: '#fbbf24' },
           { label: 'Offline', value: agents.filter(a => a.status === 'OFFLINE' || a.status === 'ERROR').length, color: '#94a3b8' },
-          { label: 'Avg Success', value: `${Math.round(agents.reduce((sum, a) => sum + a.successRate, 0) / agents.length)}%`, color: '#22d3ee' },
+          { label: 'Avg Success', value: agents.length > 0 ? `${Math.round(agents.reduce((sum, a) => sum + (a._count?.assignedTasks || 0), 0) / agents.length)}%` : '0%', color: '#22d3ee' },
         ].map((stat) => (
           <div key={stat.label} style={{
             background: 'rgba(30, 41, 59, 0.5)',
@@ -345,7 +300,6 @@ export default function AgentsPage() {
         ))}
       </div>
 
-      {/* Rest of the agents page... */}
       {/* Filters + Search */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div style={{ 
@@ -403,6 +357,13 @@ export default function AgentsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
         {filtered.map((agent) => {
           const scfg = statusConfig[agent.status];
+          const latestHeartbeat = agent.heartbeats?.[0];
+          const cpu = latestHeartbeat?.cpuPercent || 0;
+          const memory = latestHeartbeat?.memoryMb || 0;
+          const lastSeen = latestHeartbeat?.timestamp 
+            ? `${Math.floor((Date.now() - new Date(latestHeartbeat.timestamp).getTime()) / 1000)}s ago`
+            : 'Unknown';
+          
           return (
             <div key={agent.id} style={{
               background: 'rgba(30, 41, 59, 0.5)',
@@ -445,9 +406,9 @@ export default function AgentsPage() {
 
               {/* Role & Capabilities */}
               <div>
-                <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>{agent.role}</p>
+                <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '8px' }}>{agent.role || 'Agent'}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {agent.capabilities.map((cap) => (
+                  {agent.capabilities?.map((cap) => (
                     <span key={cap} style={{
                       fontSize: '10px',
                       padding: '2px 8px',
@@ -455,7 +416,7 @@ export default function AgentsPage() {
                       background: 'rgba(71, 85, 105, 0.4)',
                       color: '#cbd5e1',
                     }}>{cap}</span>
-                  ))}
+                  )) || <span style={{ fontSize: '10px', color: '#64748b' }}>No capabilities</span>}
                 </div>
               </div>
 
@@ -463,12 +424,12 @@ export default function AgentsPage() {
               <div style={{
                 padding: '10px',
                 borderRadius: '8px',
-                background: agent.currentTask ? 'rgba(6, 182, 212, 0.1)' : 'rgba(71, 85, 105, 0.2)',
-                border: `1px solid ${agent.currentTask ? 'rgba(6, 182, 212, 0.2)' : 'rgba(71, 85, 105, 0.3)'}`,
+                background: agent._count?.assignedTasks > 0 ? 'rgba(6, 182, 212, 0.1)' : 'rgba(71, 85, 105, 0.2)',
+                border: `1px solid ${agent._count?.assignedTasks > 0 ? 'rgba(6, 182, 212, 0.2)' : 'rgba(71, 85, 105, 0.3)'}`,
               }}>
-                <p style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>Current Task</p>
-                <p style={{ fontSize: '12px', color: agent.currentTask ? '#22d3ee' : '#64748b' }}>
-                  {agent.currentTask || 'Idle'}
+                <p style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>Active Tasks</p>
+                <p style={{ fontSize: '12px', color: agent._count?.assignedTasks > 0 ? '#22d3ee' : '#64748b' }}>
+                  {agent._count?.assignedTasks || 0} assigned
                 </p>
               </div>
 
@@ -478,22 +439,22 @@ export default function AgentsPage() {
                   <p style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>CPU Usage</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Cpu className="w-3 h-3" style={{ color: '#22d3ee' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>{agent.cpu}%</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>{cpu}%</span>
                   </div>
                   <div style={{ height: '4px', background: '#1e293b', borderRadius: '2px', marginTop: '4px' }}>
                     <div style={{
                       height: '100%',
                       borderRadius: '2px',
-                      background: agent.cpu > 80 ? '#ef4444' : agent.cpu > 50 ? '#f59e0b' : '#10b981',
-                      width: `${agent.cpu}%`,
+                      background: cpu > 80 ? '#ef4444' : cpu > 50 ? '#f59e0b' : '#10b981',
+                      width: `${cpu}%`,
                     }} />
                   </div>
                 </div>
                 <div>
-                  <p style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>Success Rate</p>
+                  <p style={{ fontSize: '10px', color: '#64748b', marginBottom: '4px' }}>Memory</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Zap className="w-3 h-3" style={{ color: '#fbbf24' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>{agent.successRate}%</span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>{memory}MB</span>
                   </div>
                 </div>
               </div>
@@ -502,10 +463,10 @@ export default function AgentsPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid rgba(71, 85, 105, 0.4)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b' }}>
                   <Activity className="w-3 h-3" />
-                  {agent.lastHeartbeat}
+                  {lastSeen}
                 </div>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                  {agent.tasksCompleted} tasks
+                <span style={{ fontSize: '10px', color: '#64748b' }}>
+                  {agent.model}
                 </span>
               </div>
             </div>

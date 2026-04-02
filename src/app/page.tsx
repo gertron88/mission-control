@@ -4,11 +4,61 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatusCards from '@/components/dashboard/StatusCards';
 
+interface Stats {
+  totalProjects: number;
+  activeProjects: number;
+  totalTasks: number;
+  runningTasks: number;
+  totalAgents: number;
+  onlineAgents: number;
+}
+
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
+  const [stats, setStats] = useState<Stats>({
+    totalProjects: 0,
+    activeProjects: 0,
+    totalTasks: 0,
+    runningTasks: 0,
+    totalAgents: 0,
+    onlineAgents: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    
+    async function fetchStats() {
+      try {
+        // Fetch agents
+        const agentsRes = await fetch('/api/agents');
+        const agents = agentsRes.ok ? await agentsRes.json() : [];
+        
+        // Fetch projects
+        const projectsRes = await fetch('/api/projects');
+        const projects = projectsRes.ok ? await projectsRes.json() : [];
+        
+        // Fetch tasks
+        const tasksRes = await fetch('/api/tasks');
+        const tasksData = tasksRes.ok ? await tasksRes.json() : { data: [] };
+        const tasks = tasksData.data || [];
+        
+        setStats({
+          totalAgents: agents.length,
+          onlineAgents: agents.filter((a: { status: string }) => a.status === 'ONLINE' || a.status === 'BUSY').length,
+          totalProjects: projects.length,
+          activeProjects: projects.filter((p: { state: string }) => p.state === 'EXECUTING').length,
+          totalTasks: tasks.length,
+          runningTasks: tasks.filter((t: { status: string }) => t.status === 'RUNNING').length,
+        });
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchStats();
   }, []);
 
   if (!mounted) {
@@ -27,7 +77,7 @@ export default function HomePage() {
       subtitle="All systems operational"
     >
       {/* Status cards */}
-      <StatusCards />
+      <StatusCards stats={stats} />
 
       {/* Main grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginTop: '20px' }}>

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { CheckSquare, Clock, AlertCircle, Search, Plus, Filter } from 'lucide-react';
 
- type TaskStatus = 'QUEUED' | 'READY' | 'RUNNING' | 'AWAITING_VALIDATION' | 'COMPLETE' | 'BLOCKED';
- type TaskPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+type TaskStatus = 'QUEUED' | 'READY' | 'RUNNING' | 'AWAITING_VALIDATION' | 'COMPLETE' | 'BLOCKED';
+type TaskPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
 interface Task {
   id: string;
@@ -14,110 +14,21 @@ interface Task {
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
-  assignee: string | null;
-  project: string;
-  dueDate: string;
-  estimatedHours: number;
+  assignee: {
+    id: string;
+    name: string;
+    handle: string;
+  } | null;
+  project: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  dueDate: string | null;
+  estimatedEffort: number | null;
+  actualEffort: number | null;
+  createdAt: string;
 }
-
-const tasks: Task[] = [
-  {
-    id: 't-001',
-    number: 1247,
-    title: 'Vector Index Optimization',
-    description: 'Optimize FAISS index for semantic search queries',
-    status: 'RUNNING',
-    priority: 'HIGH',
-    assignee: 'Atlas-7',
-    project: 'DataMesh',
-    dueDate: 'Today',
-    estimatedHours: 4,
-  },
-  {
-    id: 't-002',
-    number: 1248,
-    title: 'Q1 Financial Report',
-    description: 'Aggregate and analyze Q1 2026 financial data',
-    status: 'RUNNING',
-    priority: 'CRITICAL',
-    assignee: 'Nexus-3',
-    project: 'FinOps',
-    dueDate: 'Today',
-    estimatedHours: 8,
-  },
-  {
-    id: 't-003',
-    number: 1249,
-    title: 'API Rate Limit Handling',
-    description: 'Implement exponential backoff for OpenAI API',
-    status: 'BLOCKED',
-    priority: 'HIGH',
-    assignee: 'Cipher-1',
-    project: 'NLP Pipeline',
-    dueDate: 'Tomorrow',
-    estimatedHours: 3,
-  },
-  {
-    id: 't-004',
-    number: 1250,
-    title: 'Churn Model Retraining',
-    description: 'Retrain churn prediction model with new data',
-    status: 'COMPLETE',
-    priority: 'MEDIUM',
-    assignee: 'Prism-9',
-    project: 'Analytics',
-    dueDate: 'Yesterday',
-    estimatedHours: 6,
-  },
-  {
-    id: 't-005',
-    number: 1251,
-    title: 'Salesforce Integration',
-    description: 'Fix broken OAuth credentials for Salesforce',
-    status: 'BLOCKED',
-    priority: 'CRITICAL',
-    assignee: 'Vortex-4',
-    project: 'CRM Auto',
-    dueDate: 'Overdue',
-    estimatedHours: 2,
-  },
-  {
-    id: 't-006',
-    number: 1252,
-    title: 'Intel Web Crawl',
-    description: 'Scrape competitor pricing and product data',
-    status: 'RUNNING',
-    priority: 'MEDIUM',
-    assignee: 'Echo-2',
-    project: 'Intel Ops',
-    dueDate: 'Next Week',
-    estimatedHours: 12,
-  },
-  {
-    id: 't-007',
-    number: 1253,
-    title: 'Component Library Gen',
-    description: 'Generate React component library from Figma',
-    status: 'COMPLETE',
-    priority: 'LOW',
-    assignee: 'Forge-6',
-    project: 'DevAccel',
-    dueDate: 'Yesterday',
-    estimatedHours: 5,
-  },
-  {
-    id: 't-008',
-    number: 1254,
-    title: 'Inventory Reconciliation',
-    description: 'Match inventory records across 3 systems',
-    status: 'QUEUED',
-    priority: 'HIGH',
-    assignee: null,
-    project: 'SupplyChain',
-    dueDate: 'Tomorrow',
-    estimatedHours: 6,
-  },
-];
 
 const columns: { status: TaskStatus; label: string; color: string }[] = [
   { status: 'QUEUED', label: 'Queued', color: '#94a3b8' },
@@ -142,9 +53,54 @@ const statusIcons: Record<TaskStatus, React.ReactNode> = {
   BLOCKED: <AlertCircle className="w-3 h-3" />,
 };
 
+function formatDueDate(dueDate: string | null): string {
+  if (!dueDate) return 'No due date';
+  const date = new Date(dueDate);
+  const now = new Date();
+  const diffDays = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return 'Overdue';
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays < 7) return `In ${diffDays} days`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getDueDateColor(dueDate: string | null, status: TaskStatus): string {
+  if (status === 'COMPLETE') return '#34d399';
+  if (!dueDate) return '#94a3b8';
+  
+  const date = new Date(dueDate);
+  const now = new Date();
+  const diffDays = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return '#f87171';
+  if (diffDays === 0) return '#fbbf24';
+  return '#94a3b8';
+}
+
 export default function TasksPage() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    async function fetchTasks() {
+      try {
+        const response = await fetch('/api/tasks');
+        if (!response.ok) throw new Error('Failed to fetch tasks');
+        const data = await response.json();
+        setTasks(data.data || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTasks();
+  }, []);
 
   const filteredTasks = tasks.filter((t) => {
     const matchStatus = filter === 'All' || t.status === filter;
@@ -153,10 +109,32 @@ export default function TasksPage() {
     return matchStatus && matchSearch;
   });
 
+  const runningCount = tasks.filter(t => t.status === 'RUNNING').length;
+
+  if (loading) {
+    return (
+      <DashboardLayout title="Tasks" subtitle="Loading...">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+          <div style={{ color: '#22d3ee' }}>Loading tasks...</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout title="Tasks" subtitle="Error">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+          <div style={{ color: '#f87171' }}>Error: {error}</div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       title="Tasks"
-      subtitle={`${tasks.length} total — ${tasks.filter(t => t.status === 'RUNNING').length} running`}
+      subtitle={`${tasks.length} total — ${runningCount} running`}
       actions={
         <button style={{
           display: 'flex',
@@ -180,7 +158,7 @@ export default function TasksPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'Queued', value: tasks.filter(t => t.status === 'QUEUED').length, color: '#94a3b8' },
-          { label: 'Running', value: tasks.filter(t => t.status === 'RUNNING').length, color: '#22d3ee' },
+          { label: 'Running', value: runningCount, color: '#22d3ee' },
           { label: 'Blocked', value: tasks.filter(t => t.status === 'BLOCKED').length, color: '#f87171' },
           { label: 'Complete', value: tasks.filter(t => t.status === 'COMPLETE').length, color: '#34d399' },
           { label: 'Critical', value: tasks.filter(t => t.priority === 'CRITICAL').length, color: '#f87171' },
@@ -313,7 +291,7 @@ export default function TasksPage() {
                             fontSize: '9px',
                             fontWeight: 700,
                             color: 'white',
-                          }}>{task.assignee.charAt(0)}</div>
+                          }}>{task.assignee.name.charAt(0)}</div>
                         ) : (
                           <div style={{
                             width: '24px',
@@ -327,13 +305,29 @@ export default function TasksPage() {
                             <span style={{ fontSize: '10px', color: '#64748b' }}>?</span>
                           </div>
                         )}
-                        <span style={{ fontSize: '11px', color: '#64748b' }}>{task.project}</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>{task.project.name}</span>
                       </div>
                       <span style={{
                         fontSize: '10px',
-                        color: task.dueDate === 'Overdue' ? '#f87171' : task.dueDate === 'Today' ? '#fbbf24' : '#94a3b8',
-                      }}>{task.dueDate}</span>
+                        color: getDueDateColor(task.dueDate, task.status),
+                      }}>
+                        {formatDueDate(task.dueDate)}
+                      </span>
                     </div>
+
+                    {/* Effort indicator */}
+                    {task.estimatedEffort && (
+                      <div style={{ 
+                        marginTop: '8px', 
+                        paddingTop: '8px', 
+                        borderTop: '1px solid rgba(71, 85, 105, 0.3)',
+                        fontSize: '10px',
+                        color: '#64748b',
+                      }}>
+                        Est: {task.estimatedEffort}h
+                        {task.actualEffort && ` • Actual: ${task.actualEffort}h`}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
