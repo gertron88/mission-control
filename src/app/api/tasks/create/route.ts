@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         action: 'TASK_CREATED',
         resourceType: 'Task',
         resourceId: task.id,
-        afterState: task as unknown as Record<string, unknown>,
+        afterState: JSON.parse(JSON.stringify(task)),
       },
     });
 
