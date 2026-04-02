@@ -1,4 +1,6 @@
-import { useState } from 'react';
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -15,16 +17,9 @@ interface NavItem {
   path: string;
   label: string;
   icon: React.ReactNode;
-  badge?: string | number;
+  badge?: number;
   badgeColor?: string;
 }
-
-const navItems: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-  { path: '/projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, badge: 9 },
-  { path: '/tasks', label: 'Tasks', icon: <CheckSquare className="w-4 h-4" />, badge: 3, badgeColor: 'bg-red-500' },
-  { path: '/agents', label: 'Agents', icon: <Bot className="w-4 h-4" />, badge: 10 },
-];
 
 const bottomNavItems: NavItem[] = [
   { path: '/operations', label: 'Operations', icon: <Cpu className="w-4 h-4" /> },
@@ -38,7 +33,41 @@ const systemStatus = [
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [counts, setCounts] = useState({ projects: 0, tasks: 0, agents: 0 });
   const pathname = usePathname();
+
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const [agentsRes, projectsRes, tasksRes] = await Promise.all([
+          fetch('/api/agents'),
+          fetch('/api/projects'),
+          fetch('/api/tasks'),
+        ]);
+
+        const agents = agentsRes.ok ? await agentsRes.json() : [];
+        const projects = projectsRes.ok ? await projectsRes.json() : [];
+        const tasksData = tasksRes.ok ? await tasksRes.json() : { data: [] };
+
+        setCounts({
+          projects: projects.length,
+          tasks: (tasksData.data || []).length,
+          agents: agents.length,
+        });
+      } catch (err) {
+        console.error('Failed to fetch sidebar counts:', err);
+      }
+    }
+
+    fetchCounts();
+  }, []);
+
+  const navItems: NavItem[] = [
+    { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { path: '/projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, badge: counts.projects },
+    { path: '/tasks', label: 'Tasks', icon: <CheckSquare className="w-4 h-4" />, badge: counts.tasks, badgeColor: 'bg-red-500' },
+    { path: '/agents', label: 'Agents', icon: <Bot className="w-4 h-4" />, badge: counts.agents },
+  ];
 
   const isActive = (path: string) => {
     if (!pathname) return false;
@@ -130,7 +159,7 @@ export default function Sidebar() {
               {!collapsed && (
                 <>
                   <span style={{ flex: 1 }}>{item.label}</span>
-                  {item.badge !== undefined && (
+                  {item.badge !== undefined && item.badge > 0 && (
                     <span style={{ 
                       fontSize: '10px', 
                       fontFamily: 'monospace', 
