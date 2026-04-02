@@ -1,12 +1,1 @@
-/node_modules
-/.next
-/out
-.env.local
-.env.*.local
-*.log
-.DS_Store
-/coverage
-/.cache
-/dist
-*.tsbuildinfo
-.vercel
+node_modules
