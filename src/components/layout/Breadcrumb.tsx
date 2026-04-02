@@ -7,8 +7,11 @@ import { Home, ChevronRight } from "lucide-react";
 // Route name mapping
 const routeNames: Record<string, string> = {
   "/": "Dashboard",
-  "/trading": "Trading",
+  "/projects": "Projects",
+  "/tasks": "Tasks",
+  "/agents": "Agents",
   "/operations": "Operations",
+  "/trading": "Trading",
   "/settings": "Settings",
 };
 
