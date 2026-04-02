@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Bot, Activity, Cpu, Zap, Search, Plus, Download, Copy, Check } from 'lucide-react';
+import { Bot, Activity, Cpu, Zap, Search, Plus, Copy, Check } from 'lucide-react';
 
 interface Agent {
   id: string;
@@ -30,49 +30,45 @@ const statusConfig: Record<string, { color: string; bg: string; pulse: boolean }
   ERROR: { color: '#f87171', bg: 'rgba(239, 68, 68, 0.15)', pulse: false },
 };
 
-// SDK Download Component
-function SDKDownloadPanel() {
+// SDK Install Panel - Shows curl command instead of download
+function SDKInstallPanel() {
   const [copied, setCopied] = useState(false);
   
-  const installCommand = 'npm install @mission-control/agent-client';
+  const curlCommand = `curl -s https://mission-control-sage-mu.vercel.app/api/agent-sdk | node - --api-key=YOUR_API_KEY --name=agent-name`;
   
-  const exampleCode = `const { MissionControlAgent } = require('@mission-control/agent-client');
+  const exampleCode = `const { MissionControlAgent } = require('/tmp/mc-agent.js');
 
 const agent = new MissionControlAgent({
   missionControlUrl: 'https://mission-control-sage-mu.vercel.app',
   apiKey: 'your-api-key-here',
+  name: 'my-agent',
+  role: 'WORKER',
+  capabilities: ['coding', 'review']
 });
 
-await agent.connect();
-
+// Register task handler
 agent.onTask(async (task) => {
-  console.log('Received task:', task);
+  console.log('Executing:', task.title);
   
-  // Do work...
+  // Your task logic here
   const result = await doWork(task);
   
-  // Report completion
-  await agent.completeTask(task.id, result);
+  return result;
 });
 
+// Handle kill switch
 agent.onKill(() => {
-  console.log('Kill switch activated!');
+  console.log('Shutting down gracefully...');
   process.exit(0);
-});`;
+});
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(exampleCode);
+// Connect
+await agent.connect();`;
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const downloadSDK = () => {
-    const link = document.createElement('a');
-    link.href = '/agent-sdk/mission-control-agent.js';
-    link.download = 'mission-control-agent.js';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -97,36 +93,20 @@ agent.onKill(() => {
         </div>
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#e2e8f0' }}>Agent SDK</h3>
-          <p style={{ fontSize: '12px', color: '#94a3b8' }}>Connect your agents via WebSocket</p>
+          <p style={{ fontSize: '12px', color: '#94a3b8' }}>Connect agents via WebSocket</p>
         </div>
       </div>
 
       <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '16px', lineHeight: 1.5 }}>
-        Download the Mission Control Agent SDK to connect your autonomous agents. 
-        Features real-time task delivery, progress reporting, and kill switch support.
+        Agents bootstrap themselves directly from Mission Control. No manual download required.
       </p>
 
-      {/* Install command */}
-      <div style={{ marginBottom: '16px' }}>
-        <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Install via npm</p>
-        <div style={{
-          background: '#0f172a',
-          borderRadius: '8px',
-          padding: '12px',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#22d3ee',
-        }}>
-          {installCommand}
-        </div>
-      </div>
-
-      {/* Example code */}
+      {/* Quick Start curl command */}
       <div style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <p style={{ fontSize: '11px', color: '#64748b' }}>Quick Start</p>
           <button
-            onClick={copyToClipboard}
+            onClick={() => copyToClipboard(curlCommand)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -148,8 +128,43 @@ agent.onKill(() => {
           padding: '12px',
           fontFamily: 'monospace',
           fontSize: '11px',
+          color: '#22d3ee',
+          overflow: 'auto',
+          whiteSpace: 'nowrap',
+        }}>
+          {curlCommand}
+        </div>
+      </div>
+
+      {/* Example code */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <p style={{ fontSize: '11px', color: '#64748b' }}>Example Agent Script</p>
+          <button
+            onClick={() => copyToClipboard(exampleCode)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '11px',
+              color: '#64748b',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <Copy className="w-3 h-3" />
+            Copy
+          </button>
+        </div>
+        <div style={{
+          background: '#0f172a',
+          borderRadius: '8px',
+          padding: '12px',
+          fontFamily: 'monospace',
+          fontSize: '11px',
           color: '#94a3b8',
-          maxHeight: '150px',
+          maxHeight: '200px',
           overflow: 'auto',
           whiteSpace: 'pre-wrap',
         }}>
@@ -157,46 +172,17 @@ agent.onKill(() => {
         </div>
       </div>
 
-      {/* Download button */}
-      <div style={{ display: 'flex', gap: '12px' }}>
-        <button
-          onClick={downloadSDK}
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            borderRadius: '8px',
-            background: 'rgba(6, 182, 212, 0.15)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
-            color: '#67e8f9',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          <Download className="w-4 h-4" />
-          Download SDK
-        </button>
-        <a
-          href="/agent-sdk/README.md"
-          download
-          style={{
-            padding: '10px 16px',
-            borderRadius: '8px',
-            background: 'rgba(71, 85, 105, 0.3)',
-            border: '1px solid rgba(71, 85, 105, 0.5)',
-            color: '#94a3b8',
-            fontSize: '13px',
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          Docs
-        </a>
+      {/* API Endpoints reference */}
+      <div style={{ 
+        marginTop: '16px', 
+        paddingTop: '16px', 
+        borderTop: '1px solid rgba(6, 182, 212, 0.2)',
+        fontSize: '11px',
+        color: '#64748b',
+      }}>
+        <p style={{ marginBottom: '8px' }}><strong>API Endpoints:</strong></p>
+        <code style={{ color: '#94a3b8' }}>GET /api/agent-sdk</code> — SDK source code<br/>
+        <code style={{ color: '#94a3b8' }}>GET /api/agent-sdk/config</code> — Connection config
       </div>
     </div>
   );
@@ -277,8 +263,8 @@ export default function AgentsPage() {
         </button>
       }
     >
-      {/* SDK Download Panel */}
-      <SDKDownloadPanel />
+      {/* SDK Install Panel */}
+      <SDKInstallPanel />
 
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
