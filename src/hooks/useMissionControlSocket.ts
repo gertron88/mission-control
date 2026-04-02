@@ -73,7 +73,9 @@ export function useMissionControlSocket() {
   }
 
   const killAgent = (agentId: string) => {
-    socketRef.current?.to(`agent:${agentId}`).emit('kill')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const socket = socketRef.current as any
+    socket?.to(`agent:${agentId}`).emit('kill')
   }
 
   return {
