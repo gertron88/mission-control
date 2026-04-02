@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Bot, Activity, Cpu, Zap, Search, Plus, Copy, Check } from 'lucide-react';
+import { Bot, Activity, Cpu, Zap, Search, Plus, Copy, Check, Download } from 'lucide-react';
 
 interface Agent {
   id: string;
