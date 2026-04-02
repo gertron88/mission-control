@@ -79,6 +79,9 @@ model Project {
   budgetSpent     Decimal  @default(0) @db.Decimal(12, 2)
   effortEstimated Float?   // Person-hours
   effortActual    Float?   // Person-hours
+
+  // Progress Tracking
+  progress        Int      @default(0)  // 0-100 completion percentage
   
   // Relations
   milestones      Milestone[]
