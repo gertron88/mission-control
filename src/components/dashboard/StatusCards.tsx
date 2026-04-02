@@ -1,4 +1,19 @@
+use client'
+
 import { Bot, Timer, CheckCircle, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
+
+interface Stats {
+  totalProjects: number;
+  activeProjects: number;
+  totalTasks: number;
+  runningTasks: number;
+  totalAgents: number;
+  onlineAgents: number;
+}
+
+interface StatusCardsProps {
+  stats: Stats;
+}
 
 interface CardData {
   id: string;
@@ -8,73 +23,53 @@ interface CardData {
   change: string;
   trend: 'up' | 'down';
   icon: React.ReactNode;
-  bgFrom: string;
-  bgTo: string;
-  borderColor: string;
-  textColor: string;
   accentColor: string;
 }
 
-const cards: CardData[] = [
-  {
-    id: 'agents',
-    label: 'Active Agents',
-    value: 12,
-    subValue: '2 deploying',
-    change: '+2',
-    trend: 'up',
-    icon: <Bot className="w-5 h-5" />,
-    bgFrom: 'from-cyan-500/10',
-    bgTo: 'to-cyan-500/5',
-    borderColor: 'border-cyan-500/30',
-    textColor: 'text-cyan-400',
-    accentColor: '#22d3ee',
-  },
-  {
-    id: 'pending',
-    label: 'Pending Tasks',
-    value: 47,
-    subValue: '12 high priority',
-    change: '+8',
-    trend: 'up',
-    icon: <Timer className="w-5 h-5" />,
-    bgFrom: 'from-amber-500/10',
-    bgTo: 'to-amber-500/5',
-    borderColor: 'border-amber-500/30',
-    textColor: 'text-amber-400',
-    accentColor: '#fbbf24',
-  },
-  {
-    id: 'completed',
-    label: 'Completed Today',
-    value: 23,
-    subValue: 'vs 18 yesterday',
-    change: '+5',
-    trend: 'up',
-    icon: <CheckCircle className="w-5 h-5" />,
-    bgFrom: 'from-emerald-500/10',
-    bgTo: 'to-emerald-500/5',
-    borderColor: 'border-emerald-500/30',
-    textColor: 'text-emerald-400',
-    accentColor: '#34d399',
-  },
-  {
-    id: 'blocked',
-    label: 'Blocked Items',
-    value: 3,
-    subValue: '1 critical',
-    change: '-1',
-    trend: 'down',
-    icon: <AlertTriangle className="w-5 h-5" />,
-    bgFrom: 'from-red-500/10',
-    bgTo: 'to-red-500/5',
-    borderColor: 'border-red-500/30',
-    textColor: 'text-red-400',
-    accentColor: '#f87171',
-  },
-];
+export default function StatusCards({ stats }: StatusCardsProps) {
+  const cards: CardData[] = [
+    {
+      id: 'agents',
+      label: 'Active Agents',
+      value: stats.totalAgents,
+      subValue: `${stats.onlineAgents} online`,
+      change: '+2',
+      trend: 'up',
+      icon: <Bot className="w-5 h-5" />,
+      accentColor: '#22d3ee',
+    },
+    {
+      id: 'projects',
+      label: 'Active Projects',
+      value: stats.activeProjects,
+      subValue: `${stats.totalProjects} total`,
+      change: '+1',
+      trend: 'up',
+      icon: <CheckCircle className="w-5 h-5" />,
+      accentColor: '#34d399',
+    },
+    {
+      id: 'tasks',
+      label: 'Running Tasks',
+      value: stats.runningTasks,
+      subValue: `${stats.totalTasks} total`,
+      change: '+3',
+      trend: 'up',
+      icon: <Timer className="w-5 h-5" />,
+      accentColor: '#fbbf24',
+    },
+    {
+      id: 'system',
+      label: 'System Health',
+      value: 98,
+      subValue: 'Operational',
+      change: '+0',
+      trend: 'up',
+      icon: <AlertTriangle className="w-5 h-5" />,
+      accentColor: '#a78bfa',
+    },
+  ];
 
-export default function StatusCards() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
       {cards.map((card) => (
@@ -83,7 +78,7 @@ export default function StatusCards() {
           style={{
             background: 'rgba(30, 41, 59, 0.5)',
             backdropFilter: 'blur(12px)',
-            border: `1px solid ${card.id === 'agents' ? 'rgba(34, 211, 238, 0.3)' : card.id === 'pending' ? 'rgba(251, 191, 36, 0.3)' : card.id === 'completed' ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'}`,
+            border: `1px solid ${card.id === 'agents' ? 'rgba(34, 211, 238, 0.3)' : card.id === 'projects' ? 'rgba(52, 211, 153, 0.3)' : card.id === 'tasks' ? 'rgba(251, 191, 36, 0.3)' : 'rgba(167, 139, 250, 0.3)'}`,
             borderRadius: '12px',
             padding: '20px',
             position: 'relative',
@@ -114,7 +109,7 @@ export default function StatusCards() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '12px',
-                border: `1px solid ${card.id === 'agents' ? 'rgba(34, 211, 238, 0.3)' : card.id === 'pending' ? 'rgba(251, 191, 36, 0.3)' : card.id === 'completed' ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'}`,
+                border: `1px solid ${card.id === 'agents' ? 'rgba(34, 211, 238, 0.3)' : card.id === 'projects' ? 'rgba(52, 211, 153, 0.3)' : card.id === 'tasks' ? 'rgba(251, 191, 36, 0.3)' : 'rgba(167, 139, 250, 0.3)'}`,
                 background: 'rgba(15, 23, 42, 0.5)',
                 color: card.accentColor,
               }}
