@@ -1,4 +1,4 @@
-use client'
+'use client'
 
 import { Bot, Timer, CheckCircle, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 
