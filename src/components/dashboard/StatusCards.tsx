@@ -12,7 +12,7 @@ interface Stats {
 }
 
 interface StatusCardsProps {
-  stats: Stats;
+  stats?: Stats;
 }
 
 interface CardData {
@@ -27,12 +27,23 @@ interface CardData {
 }
 
 export default function StatusCards({ stats }: StatusCardsProps) {
+  // Default stats if not provided
+  const defaultStats: Stats = {
+    totalProjects: 0,
+    activeProjects: 0,
+    totalTasks: 0,
+    runningTasks: 0,
+    totalAgents: 1,
+    onlineAgents: 1,
+  };
+  
+  const resolvedStats = stats ?? defaultStats;
   const cards: CardData[] = [
     {
       id: 'agents',
       label: 'Active Agents',
-      value: stats.totalAgents,
-      subValue: `${stats.onlineAgents} online`,
+      value: resolvedStats.totalAgents,
+      subValue: `${resolvedStats.onlineAgents} online`,
       change: '+2',
       trend: 'up',
       icon: <Bot className="w-5 h-5" />,
@@ -41,8 +52,8 @@ export default function StatusCards({ stats }: StatusCardsProps) {
     {
       id: 'projects',
       label: 'Active Projects',
-      value: stats.activeProjects,
-      subValue: `${stats.totalProjects} total`,
+      value: resolvedStats.activeProjects,
+      subValue: `${resolvedStats.totalProjects} total`,
       change: '+1',
       trend: 'up',
       icon: <CheckCircle className="w-5 h-5" />,
@@ -51,8 +62,8 @@ export default function StatusCards({ stats }: StatusCardsProps) {
     {
       id: 'tasks',
       label: 'Running Tasks',
-      value: stats.runningTasks,
-      subValue: `${stats.totalTasks} total`,
+      value: resolvedStats.runningTasks,
+      subValue: `${resolvedStats.totalTasks} total`,
       change: '+3',
       trend: 'up',
       icon: <Timer className="w-5 h-5" />,
