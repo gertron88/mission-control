@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { useEvents } from '@/hooks/useEvents'
+import { useState, useEffect } from 'react'
 import { Wifi, WifiOff, Loader2 } from 'lucide-react'
 
 /**
  * Connection status indicator with tooltip
+ * Polls /api/health/services for connection status
  * 
  * States:
  * - Connected: Green pulse animation
@@ -13,7 +13,28 @@ import { Wifi, WifiOff, Loader2 } from 'lucide-react'
  * - Reconnecting: Amber spinner
  */
 export function StatusIndicator() {
-  const { status } = useEvents()
+  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/health/services')
+        if (res.ok) {
+          const services = await res.json()
+          const allHealthy = services.every((s: {status: string}) => s.status === 'healthy')
+          setStatus(allHealthy ? 'connected' : 'error')
+        } else {
+          setStatus('error')
+        }
+      } catch {
+        setStatus('disconnected')
+      }
+    }
+
+    checkHealth()
+    const interval = setInterval(checkHealth, 30000) // Poll every 30s
+    return () => clearInterval(interval)
+  }, [])
   const [showTooltip, setShowTooltip] = useState(false)
 
   const config = {
