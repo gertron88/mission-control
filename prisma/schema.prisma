@@ -427,6 +427,9 @@ model Agent {
   tasksToday      Int      @default(0)
   lastTaskDate    DateTime?
   
+  // Rate limit tracking
+  disabledReason  String?  // e.g., 'DAILY_LIMIT_REACHED', 'RATE_LIMIT_HIT', 'MANUAL'
+  
   // Metadata
   lastSeenAt      DateTime?
   lastIpAddress   String?

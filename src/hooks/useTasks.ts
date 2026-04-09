@@ -2,13 +2,16 @@
  * Tasks React Query Hooks
  * 
  * Provides:
- * - useTasks: List tasks with filtering and pagination
+ * - useTasks: List tasks with filtering and pagination (with real-time sync)
  * - useTask: Get single task details
  * - useCreateTask: Create new task (optimistic)
  * - useUpdateTask: Update task (optimistic)
  * - useAssignTask: Auto-assign task
  * - useBlockTask: Block task with reason
  * - useUnblockTask: Unblock task
+ * 
+ * All hooks support automatic real-time synchronization via SSE events.
+ * Falls back to polling when SSE is unavailable.
  */
 
 'use client'
@@ -17,6 +20,7 @@ import { useQuery, useMutation, useQueryClient, UseQueryResult, UseMutationResul
 import { queryKeys, LIST_REFETCH_INTERVAL } from '@/lib/query-client'
 import { endpoints, Task, CreateTaskInput, UpdateTaskInput, TaskFilters } from '@/lib/api'
 import { TaskStatus } from '@prisma/client'
+import { useRealtimeSync } from './useRealtimeSync'
 
 // ============================================================================
 // Query Hooks
@@ -26,14 +30,23 @@ import { TaskStatus } from '@prisma/client'
  * Hook for fetching tasks list with filters
  * 
  * Features:
- * - Automatic refetching every 60s
+ * - Real-time updates via SSE (primary)
+ * - Polling fallback every 60s
  * - Pagination support
  * - Filter by status, project, assignee, etc.
+ * 
+ * Real-time sync is automatically enabled when this hook is mounted.
  */
 export function useTasks(filters: TaskFilters = {}): UseQueryResult<{
   tasks: Task[]
   meta: { page: number; limit: number; total: number; hasMore: boolean }
 }, Error> {
+  // Enable real-time synchronization
+  useRealtimeSync({
+    enableSSE: true,
+    pollIntervalMs: LIST_REFETCH_INTERVAL,
+  })
+
   return useQuery({
     queryKey: queryKeys.tasks.list(filters as Record<string, unknown>),
     queryFn: () => endpoints.tasks.list(filters),

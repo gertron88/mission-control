@@ -340,3 +340,6 @@ export type AgentRole =
   | 'CUSTOM';
 
 export type AgentStatus = 'ONLINE' | 'BUSY' | 'AWAY' | 'OFFLINE' | 'ERROR' | 'DISABLED';
+
+// Re-export rate limit types
+export * from './rate-limits';

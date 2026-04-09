@@ -1,0 +1,17 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/staleness-check",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/daily-reset",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/events/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
