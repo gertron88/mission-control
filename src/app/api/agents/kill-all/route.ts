@@ -49,26 +49,31 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Create kill events for each agent
-    const killEvents = agentsToKill.map((agent) => ({
-      agentId: agent.id,
-      agentName: agent.name,
-      reason,
-      killedBy: 'global-kill-switch',
-      killedAt: new Date(),
+    // Create audit log entries for each killed agent
+    const auditEntries = agentsToKill.map((agent) => ({
+      action: 'AGENT_KILLED',
+      actorType: 'HUMAN' as const,
+      actorName: 'Global Kill Switch',
+      resourceType: 'Agent',
+      resourceId: agent.id,
+      severity: 'CRITICAL' as const,
+      beforeState: { status: agent.status },
+      afterState: { status: 'OFFLINE', reason, killedBy: 'global-kill-switch' },
     }));
 
-    await prisma.killEvent.createMany({
-      data: killEvents,
+    await prisma.auditLog.createMany({
+      data: auditEntries,
     });
 
-    // Create audit log entry
-    await prisma.auditEvent.create({
+    // Create global kill switch audit entry
+    await prisma.auditLog.create({
       data: {
-        eventType: 'GLOBAL_KILL_SWITCH',
+        action: 'GLOBAL_KILL_SWITCH',
+        actorType: 'HUMAN',
+        actorName: 'Kill Switch',
+        resourceType: 'System',
         severity: 'CRITICAL',
-        message: `Global kill switch activated - ${agentsToKill.length} agents terminated`,
-        payload: {
+        afterState: {
           reason,
           killedCount: agentsToKill.length,
           agentIds: agentsToKill.map((a) => a.id),

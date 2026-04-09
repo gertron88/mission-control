@@ -30,25 +30,17 @@ export async function POST(
       },
     });
 
-    // Create kill history entry
-    await prisma.killEvent.create({
-      data: {
-        agentId: id,
-        agentName: agent.name,
-        reason,
-        killedBy: 'manual',
-        killedAt: new Date(),
-      },
-    });
-
     // Create audit log entry
-    await prisma.auditEvent.create({
+    await prisma.auditLog.create({
       data: {
-        eventType: 'AGENT_KILLED',
-        severity: 'HIGH',
-        message: `Agent ${agent.name} terminated via kill switch`,
-        agentId: id,
-        payload: { reason, killedBy: 'manual' },
+        action: 'AGENT_KILLED',
+        actorType: 'HUMAN',
+        actorName: 'Kill Switch',
+        resourceType: 'Agent',
+        resourceId: id,
+        severity: 'CRITICAL',
+        beforeState: { status: agent.status },
+        afterState: { status: 'OFFLINE', reason, killedBy: 'manual' },
       },
     });
 

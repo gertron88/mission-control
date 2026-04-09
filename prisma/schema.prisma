@@ -1034,17 +1034,4 @@ model Notification {
   @@map("notifications")
 }
 
-// Kill Switch Event Log
-model KillEvent {
-  id          String   @id @default(cuid())
-  
-  agentId     String
-  agentName   String
-  reason      String
-  killedBy    String   // 'manual' or 'global-kill-switch'
-  killedAt    DateTime @default(now())
-  
-  @@index([agentId, killedAt])
-  @@index([killedAt])
-  @@map("kill_events")
-}
+

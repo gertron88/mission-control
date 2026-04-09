@@ -2,7 +2,7 @@
  * Kill Switch History API Endpoint
  * GET /api/kill-switch/history
  * 
- * Returns history of all kill events
+ * Returns history of all kill events from audit log
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,14 +15,31 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
-    const history = await prisma.killEvent.findMany({
+    // Query audit log for kill events
+    const history = await prisma.auditLog.findMany({
+      where: {
+        action: {
+          in: ['AGENT_KILLED', 'GLOBAL_KILL_SWITCH'],
+        },
+      },
       orderBy: {
-        killedAt: 'desc',
+        timestamp: 'desc',
       },
       take: limit,
     });
 
-    return NextResponse.json(history);
+    // Transform to kill event format
+    const transformed = history.map((entry) => ({
+      id: entry.id,
+      agentId: entry.resourceId,
+      agentName: entry.afterState?.agentName || entry.actorName,
+      reason: entry.afterState?.reason || 'Kill switch activation',
+      killedBy: entry.afterState?.killedBy || entry.actorName,
+      killedAt: entry.timestamp,
+      globalKill: entry.action === 'GLOBAL_KILL_SWITCH',
+    }));
+
+    return NextResponse.json(transformed);
   } catch (error) {
     console.error('Kill history error:', error);
     return NextResponse.json(
