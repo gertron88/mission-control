@@ -29,15 +29,18 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform to kill event format
-    const transformed = history.map((entry) => ({
-      id: entry.id,
-      agentId: entry.resourceId,
-      agentName: entry.afterState?.agentName || entry.actorName,
-      reason: entry.afterState?.reason || 'Kill switch activation',
-      killedBy: entry.afterState?.killedBy || entry.actorName,
-      killedAt: entry.timestamp,
-      globalKill: entry.action === 'GLOBAL_KILL_SWITCH',
-    }));
+    const transformed = history.map((entry) => {
+      const afterState = entry.afterState as { agentName?: string; reason?: string; killedBy?: string } | null;
+      return {
+        id: entry.id,
+        agentId: entry.resourceId,
+        agentName: afterState?.agentName || entry.actorName,
+        reason: afterState?.reason || 'Kill switch activation',
+        killedBy: afterState?.killedBy || entry.actorName,
+        killedAt: entry.timestamp,
+        globalKill: entry.action === 'GLOBAL_KILL_SWITCH',
+      };
+    });
 
     return NextResponse.json(transformed);
   } catch (error) {
