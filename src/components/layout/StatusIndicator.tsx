@@ -19,14 +19,38 @@ export function StatusIndicator() {
     const checkHealth = async () => {
       try {
         const res = await fetch('/api/health/services')
-        if (res.ok) {
-          const services = await res.json()
-          const allHealthy = services.every((s: {status: string}) => s.status === 'healthy')
-          setStatus(allHealthy ? 'connected' : 'error')
-        } else {
+        if (!res.ok) {
+          console.error('[StatusIndicator] Health check failed:', res.status, res.statusText)
           setStatus('error')
+          return
         }
-      } catch {
+        
+        let services
+        try {
+          services = await res.json()
+        } catch (parseErr) {
+          console.error('[StatusIndicator] Failed to parse response:', parseErr)
+          setStatus('error')
+          return
+        }
+        
+        // Validate response is an array
+        if (!Array.isArray(services)) {
+          console.error('[StatusIndicator] Invalid response format (expected array):', services)
+          setStatus('error')
+          return
+        }
+        
+        // Handle empty array - still connected if API responds
+        if (services.length === 0) {
+          setStatus('connected')
+          return
+        }
+        
+        const allHealthy = services.every((s: {status: string}) => s.status === 'healthy')
+        setStatus(allHealthy ? 'connected' : 'error')
+      } catch (err) {
+        console.error('[StatusIndicator] Health check error:', err)
         setStatus('disconnected')
       }
     }
