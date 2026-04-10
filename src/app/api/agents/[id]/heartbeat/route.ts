@@ -169,7 +169,7 @@ export async function POST(
     });
 
     // Record heartbeat
-    const heartbeatMetadata: Record<string, unknown> = {
+    const heartbeatMetadata = {
       ...validated.metadata,
       rateLimits: validated.rateLimits,
       currentTaskId: validated.currentTaskId,
@@ -186,7 +186,7 @@ export async function POST(
         cpuUsage: validated.cpuUsage,
         memoryUsage: validated.memoryUsage,
         activeTaskCount: validated.activeTaskCount,
-        metadata: heartbeatMetadata,
+        metadata: heartbeatMetadata as any,
       },
     });
 
