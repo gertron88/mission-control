@@ -159,7 +159,7 @@ async function detectHungTasks(now: Date): Promise<{
       });
     } else if (!task.assignee || task.assignee.status === AgentStatus.OFFLINE) {
       // Agent is offline - retry if possible
-      const retryResult = await attemptTaskRetry(task, now);
+      const retryResult = await attemptTaskRetry({...task, assigneeId: task.assigneeId}, now);
       if (retryResult.success) {
         results.retriedTasks++;
         results.details.push({
@@ -259,7 +259,7 @@ async function handleTaskFailure(
  * Attempt to retry a task by reassigning it
  */
 async function attemptTaskRetry(
-  task: { id: string; title: string; retryCount: number; maxRetries: number },
+  task: { id: string; title: string; assigneeId: string | null; retryCount: number; maxRetries: number },
   now: Date
 ): Promise<{ success: boolean; reason?: string }> {
   if (task.retryCount >= task.maxRetries) {
