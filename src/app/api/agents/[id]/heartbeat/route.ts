@@ -169,22 +169,24 @@ export async function POST(
     });
 
     // Record heartbeat
+    const heartbeatMetadata: Record<string, unknown> = {
+      ...validated.metadata,
+      rateLimits: validated.rateLimits,
+      currentTaskId: validated.currentTaskId,
+      currentTaskStartedAt: validated.currentTaskStartedAt,
+      hangWarning,
+      memoryUsagePercent: validated.memoryUsagePercent,
+      diskUsage: validated.diskUsage,
+      networkLatency: validated.networkLatency,
+    };
+    
     const heartbeat = await prisma.agentHeartbeat.create({
       data: {
         agentId: params.id,
         cpuUsage: validated.cpuUsage,
         memoryUsage: validated.memoryUsage,
         activeTaskCount: validated.activeTaskCount,
-        metadata: {
-          ...validated.metadata,
-          rateLimits: validated.rateLimits,
-          currentTaskId: validated.currentTaskId,
-          currentTaskStartedAt: validated.currentTaskStartedAt,
-          hangWarning,
-          memoryUsagePercent: validated.memoryUsagePercent,
-          diskUsage: validated.diskUsage,
-          networkLatency: validated.networkLatency,
-        } as Record<string, unknown>,
+        metadata: heartbeatMetadata,
       },
     });
 
