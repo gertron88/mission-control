@@ -1,12 +1,15 @@
 /**
- * Mission Control Agent Client SDK v2.0
- * WebSocket/SSE-based agent for Mission Control dashboard
- * Features: Task claiming, progress tracking, planning docs, summary reports
- * @version 2.0.0
+ * Mission Control Agent Client SDK v3.0
+ * WebSocket/SSE-based agent with built-in git coordination
+ * Features: Task management, progress tracking, planning docs, summary reports,
+ *           git-based coordination, triggers, polling, handoffs
+ * @version 3.0.0
  */
 
 const { io } = require('socket.io-client');
 const EventEmitter = require('events');
+const fs = require('fs');
+const path = require('path');
 
 class MissionControlAgent extends EventEmitter {
   constructor(config = {}) {
@@ -16,10 +19,17 @@ class MissionControlAgent extends EventEmitter {
       missionControlUrl: config.missionControlUrl || process.env.MISSION_CONTROL_URL,
       apiKey: config.apiKey || process.env.MISSION_CONTROL_API_KEY,
       agentId: config.agentId || null,
-      heartbeatInterval: config.heartbeatInterval || 30000,
+      handle: config.handle || process.env.AGENT_NAME || `agent-${Date.now()}`,
+      name: config.name || process.env.AGENT_NAME || 'Unnamed Agent',
+      role: config.role || 'General Purpose',
       capabilities: config.capabilities || [],
-      pollInterval: config.pollInterval || 30000, // For polling mode
-      useWebSocket: config.useWebSocket !== false, // Default to WebSocket
+      model: config.model || 'default',
+      heartbeatInterval: config.heartbeatInterval || 30000,
+      pollInterval: config.pollInterval || 30000,
+      useWebSocket: config.useWebSocket !== false,
+      // Git coordination settings
+      sharedWorkspace: config.sharedWorkspace || process.env.SHARED_WORKSPACE || '/opt/shared-workspace',
+      enableGitCoordination: config.enableGitCoordination !== false,
       ...config
     };
     
@@ -33,6 +43,43 @@ class MissionControlAgent extends EventEmitter {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
     this.isPolling = false;
+    this.gitPollTimer = null;
+  }
+
+  /**
+   * Initialize agent - setup workspace and connect
+   */
+  async initialize() {
+    if (this.config.enableGitCoordination) {
+      await this._setupWorkspace();
+    }
+    return this.connect();
+  }
+
+  /**
+   * Setup shared workspace structure
+   */
+  async _setupWorkspace() {
+    const workspace = this.config.sharedWorkspace;
+    const agentDir = path.join(workspace, 'agents', this.config.handle);
+    
+    // Create agent-specific directory
+    fs.mkdirSync(agentDir, { recursive: true });
+    
+    // Write agent capabilities
+    fs.writeFileSync(
+      path.join(agentDir, 'capabilities.json'),
+      JSON.stringify({
+        handle: this.config.handle,
+        name: this.config.name,
+        role: this.config.role,
+        capabilities: this.config.capabilities,
+        model: this.config.model,
+        initializedAt: new Date().toISOString()
+      }, null, 2)
+    );
+    
+    console.log('[Agent] Workspace initialized:', workspace);
   }
 
   /**
@@ -51,10 +98,31 @@ class MissionControlAgent extends EventEmitter {
       await this.register();
     }
 
+    // Sync workspace before connecting
+    if (this.config.enableGitCoordination) {
+      await this.syncWorkspace();
+    }
+
     if (this.config.useWebSocket) {
       return this.connectWebSocket();
     } else {
       return this.connectSSE();
+    }
+  }
+
+  /**
+   * Sync git workspace (pull latest)
+   */
+  async syncWorkspace() {
+    try {
+      const { execSync } = require('child_process');
+      execSync('git pull', { 
+        cwd: this.config.sharedWorkspace,
+        stdio: 'pipe'
+      });
+      console.log('[Agent] Workspace synced');
+    } catch (err) {
+      console.warn('[Agent] Git sync warning:', err.message);
     }
   }
 
@@ -84,6 +152,7 @@ class MissionControlAgent extends EventEmitter {
         this.reconnectAttempts = 0;
         this.isPolling = false;
         this.startHeartbeat();
+        this._startGitPolling();
         this.emit('connected');
         resolve();
       });
@@ -92,6 +161,7 @@ class MissionControlAgent extends EventEmitter {
         console.log('[MissionControl] WebSocket disconnected:', reason);
         this.connected = false;
         this.stopHeartbeat();
+        this._stopGitPolling();
         this.emit('disconnected', reason);
       });
 
@@ -100,7 +170,6 @@ class MissionControlAgent extends EventEmitter {
         this.reconnectAttempts++;
         
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          // Fall back to polling
           console.log('[MissionControl] Falling back to polling mode');
           this.socket = null;
           this.connectSSE().then(resolve).catch(reject);
@@ -110,13 +179,11 @@ class MissionControlAgent extends EventEmitter {
         this.emit('error', error);
       });
 
-      // Handle task assignment
       socket.on('task:assign', (task) => {
         console.log('[MissionControl] Task assigned:', task.id);
         this.handleTaskAssigned(task);
       });
 
-      // Handle kill switch
       socket.on('kill', () => {
         console.log('[MissionControl] Kill switch activated!');
         this.emit('kill');
@@ -124,7 +191,6 @@ class MissionControlAgent extends EventEmitter {
         process.exit(0);
       });
 
-      // Handle ping (keepalive)
       socket.on('ping', () => {
         socket.emit('pong');
       });
@@ -148,6 +214,7 @@ class MissionControlAgent extends EventEmitter {
         this.isPolling = true;
         this.startPolling();
         this.startHeartbeat();
+        this._startGitPolling();
         this.emit('connected');
         resolve();
       };
@@ -189,11 +256,11 @@ class MissionControlAgent extends EventEmitter {
         'Authorization': `Bearer ${this.config.apiKey}`
       },
       body: JSON.stringify({
-        handle: this.config.handle || `agent-${Date.now()}`,
-        name: this.config.name || 'Unnamed Agent',
-        role: this.config.role || 'General Purpose',
+        handle: this.config.handle,
+        name: this.config.name,
+        role: this.config.role,
         capabilities: this.config.capabilities,
-        model: this.config.model || 'default',
+        model: this.config.model,
       })
     });
 
@@ -211,7 +278,7 @@ class MissionControlAgent extends EventEmitter {
   /**
    * Handle task assignment
    */
-  handleTaskAssigned(task) {
+  async handleTaskAssigned(task) {
     // Check if task has planning doc requirement
     if (task.requiresPlanningDoc && !task.planningDoc) {
       console.log('[MissionControl] Task requires planning doc, cannot start:', task.id);
@@ -226,11 +293,32 @@ class MissionControlAgent extends EventEmitter {
       checkpoints: [],
     };
     
+    // Save to local state
+    this._saveCurrentTask();
+    
+    // Create trigger for other agents
+    if (this.config.enableGitCoordination) {
+      await this.createTrigger(task.projectId, 'task-started', `Task ${task.id} started by ${this.config.handle}`);
+    }
+    
     this.emit('task', task);
   }
 
   /**
-   * Start heartbeat (every 30s)
+   * Save current task to disk
+   */
+  _saveCurrentTask() {
+    const taskPath = path.join(
+      this.config.sharedWorkspace,
+      'agents',
+      this.config.handle,
+      'current-task.json'
+    );
+    fs.writeFileSync(taskPath, JSON.stringify(this.currentTask, null, 2));
+  }
+
+  /**
+   * Start heartbeat
    */
   startHeartbeat() {
     this.heartbeatTimer = setInterval(() => {
@@ -246,13 +334,13 @@ class MissionControlAgent extends EventEmitter {
         metadata: {
           capabilities: this.config.capabilities,
           progress: this.currentTask?.progress || 0,
+          role: this.config.role,
         }
       };
 
       if (this.socket) {
         this.socket.emit('heartbeat', heartbeat);
       } else {
-        // POST heartbeat for polling mode
         this.postHeartbeat(heartbeat);
       }
       
@@ -261,7 +349,190 @@ class MissionControlAgent extends EventEmitter {
   }
 
   /**
-   * Post heartbeat via HTTP (polling mode)
+   * Start git polling for coordination updates
+   */
+  _startGitPolling() {
+    if (!this.config.enableGitCoordination) return;
+    
+    this.gitPollTimer = setInterval(async () => {
+      await this.checkForCoordinationUpdates();
+    }, 60000); // Check every minute
+  }
+
+  /**
+   * Check for coordination updates from other agents
+   */
+  async checkForCoordinationUpdates() {
+    try {
+      const { execSync } = require('child_process');
+      
+      // Check if behind
+      execSync('git fetch origin', { 
+        cwd: this.config.sharedWorkspace,
+        stdio: 'pipe'
+      });
+      
+      const local = execSync('git rev-parse @', { cwd: this.config.sharedWorkspace }).toString().trim();
+      const remote = execSync('git rev-parse @{u}', { cwd: this.config.sharedWorkspace }).toString().trim();
+      
+      if (local !== remote) {
+        console.log('[Agent] Coordination updates available');
+        this.emit('coordination:updates_available');
+        
+        // Auto-pull if not currently working
+        if (!this.currentTask) {
+          execSync('git pull', { cwd: this.config.sharedWorkspace, stdio: 'pipe' });
+          console.log('[Agent] Auto-pulled updates');
+          this.emit('coordination:synced');
+        }
+      }
+    } catch (err) {
+      // Silently fail - not critical
+    }
+  }
+
+  /**
+   * Create a trigger file for other agents
+   */
+  async createTrigger(projectId, type, message) {
+    if (!this.config.enableGitCoordination) return;
+    
+    const triggerDir = path.join(
+      this.config.sharedWorkspace,
+      'projects',
+      projectId,
+      'triggers',
+      type
+    );
+    
+    fs.mkdirSync(triggerDir, { recursive: true });
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const triggerFile = path.join(triggerDir, `${timestamp}-${this.config.handle}.json`);
+    
+    fs.writeFileSync(triggerFile, JSON.stringify({
+      agent: this.config.handle,
+      timestamp: new Date().toISOString(),
+      type,
+      message
+    }, null, 2));
+    
+    // Auto-commit trigger
+    try {
+      const { execSync } = require('child_process');
+      execSync('git add .', { cwd: this.config.sharedWorkspace });
+      execSync(`git commit -m "${this.config.handle}: trigger - ${type}"`, { 
+        cwd: this.config.sharedWorkspace 
+      });
+      execSync('git push', { cwd: this.config.sharedWorkspace });
+    } catch (err) {
+      console.warn('[Agent] Failed to push trigger:', err.message);
+    }
+  }
+
+  /**
+   * Create a handoff file for another agent
+   */
+  async createHandoff(projectId, targetAgent, summary, details = {}) {
+    if (!this.config.enableGitCoordination) return;
+    
+    const handoffDir = path.join(
+      this.config.sharedWorkspace,
+      'projects',
+      projectId,
+      'handoffs'
+    );
+    
+    fs.mkdirSync(handoffDir, { recursive: true });
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '').slice(0, 13);
+    const handoffFile = path.join(
+      handoffDir,
+      `${timestamp}-${this.config.handle}-to-${targetAgent}.md`
+    );
+    
+    const content = `---
+from: ${this.config.handle}
+to: ${targetAgent}
+timestamp: ${new Date().toISOString()}
+project: ${projectId}
+---
+
+## Summary
+${summary}
+
+## Context
+${details.context || 'N/A'}
+
+## Files Changed
+${(details.files || []).map(f => `- ${f}`).join('\n') || '- N/A'}
+
+## Blockers
+${details.blockers || 'None'}
+
+## Questions
+${details.questions || 'None'}
+`;
+    
+    fs.writeFileSync(handoffFile, content);
+    
+    // Commit handoff
+    try {
+      const { execSync } = require('child_process');
+      execSync('git add .', { cwd: this.config.sharedWorkspace });
+      execSync(`git commit -m "${this.config.handle}: handoff to ${targetAgent}"`, {
+        cwd: this.config.sharedWorkspace
+      });
+      execSync('git push', { cwd: this.config.sharedWorkspace });
+      console.log('[Agent] Handoff created:', handoffFile);
+    } catch (err) {
+      console.warn('[Agent] Failed to push handoff:', err.message);
+    }
+    
+    return handoffFile;
+  }
+
+  /**
+   * Update project status file
+   */
+  async updateProjectStatus(projectId, updates) {
+    if (!this.config.enableGitCoordination) return;
+    
+    const statusPath = path.join(
+      this.config.sharedWorkspace,
+      'projects',
+      projectId,
+      'STATUS.md'
+    );
+    
+    let content = '';
+    if (fs.existsSync(statusPath)) {
+      content = fs.readFileSync(statusPath, 'utf8');
+    }
+    
+    // Append update
+    const updateEntry = `
+## ${new Date().toISOString()} - ${this.config.handle}
+${updates}
+`;
+    
+    fs.writeFileSync(statusPath, content + updateEntry);
+    
+    // Commit
+    try {
+      const { execSync } = require('child_process');
+      execSync('git add .', { cwd: this.config.sharedWorkspace });
+      execSync(`git commit -m "${this.config.handle}: update status"`, {
+        cwd: this.config.sharedWorkspace
+      });
+      execSync('git push', { cwd: this.config.sharedWorkspace });
+    } catch (err) {
+      console.warn('[Agent] Failed to push status:', err.message);
+    }
+  }
+
+  /**
+   * Post heartbeat via HTTP
    */
   async postHeartbeat(heartbeat) {
     try {
@@ -279,14 +550,13 @@ class MissionControlAgent extends EventEmitter {
   }
 
   /**
-   * Start polling for tasks (SSE mode)
+   * Start polling for tasks
    */
   startPolling() {
     this.pollTimer = setInterval(async () => {
       if (!this.connected || this.currentTask) return;
       
       try {
-        // Check for available tasks
         const response = await fetch(
           `${this.config.missionControlUrl}/api/tasks?status=READY&assignee=null`,
           {
@@ -300,7 +570,6 @@ class MissionControlAgent extends EventEmitter {
         
         const tasks = await response.json();
         
-        // Find matching task by capabilities
         const matchingTask = tasks.find(task => 
           this.canHandleTask(task)
         );
@@ -353,7 +622,6 @@ class MissionControlAgent extends EventEmitter {
       
       const task = await response.json();
       
-      // Check for planning doc requirement
       if (task.requiresPlanningDoc && !task.planningDoc) {
         console.log('[MissionControl] Task requires planning doc');
         this.emit('task:planning_required', task);
@@ -385,6 +653,7 @@ class MissionControlAgent extends EventEmitter {
         timestamp: new Date().toISOString(),
         ...metadata
       });
+      this._saveCurrentTask();
     }
 
     const data = {
@@ -438,6 +707,8 @@ class MissionControlAgent extends EventEmitter {
           Date.now() - new Date(this.currentTask.startedAt).getTime() : null,
         outcome: 'success',
         notes: 'Task completed successfully',
+        completedBy: this.config.handle,
+        role: this.config.role,
       },
       timestamp: new Date().toISOString(),
     };
@@ -455,8 +726,18 @@ class MissionControlAgent extends EventEmitter {
       });
     }
 
+    // Create completion trigger
+    if (this.config.enableGitCoordination) {
+      await this.createTrigger(
+        this.currentTask?.projectId || 'unknown',
+        'task-completed',
+        `Task ${taskId} completed by ${this.config.handle}`
+      );
+    }
+
     if (this.currentTask?.id === taskId) {
       this.currentTask = null;
+      this._clearCurrentTask();
     }
 
     this.emit('task:completed', { taskId, result, summaryReport });
@@ -480,6 +761,8 @@ class MissionControlAgent extends EventEmitter {
         outcome: 'failed',
         error: error.message || String(error),
         notes: 'Task failed - see error details',
+        failedBy: this.config.handle,
+        role: this.config.role,
       },
       retryable: error.retryable !== false,
       timestamp: new Date().toISOString(),
@@ -498,15 +781,44 @@ class MissionControlAgent extends EventEmitter {
       });
     }
 
+    // Create failure trigger
+    if (this.config.enableGitCoordination) {
+      await this.createTrigger(
+        this.currentTask?.projectId || 'unknown',
+        'blocked',
+        `Task ${taskId} failed: ${error.message}`
+      );
+    }
+
     if (this.currentTask?.id === taskId) {
       this.currentTask = null;
+      this._clearCurrentTask();
     }
 
     this.emit('task:failed', { taskId, error, summaryReport });
   }
 
   /**
-   * Submit planning document for a project or task
+   * Clear current task file
+   */
+  _clearCurrentTask() {
+    try {
+      const taskPath = path.join(
+        this.config.sharedWorkspace,
+        'agents',
+        this.config.handle,
+        'current-task.json'
+      );
+      if (fs.existsSync(taskPath)) {
+        fs.unlinkSync(taskPath);
+      }
+    } catch (err) {
+      // Ignore
+    }
+  }
+
+  /**
+   * Submit planning document for a project
    */
   async submitPlanningDoc(projectId, planningDoc) {
     console.log('[MissionControl] Submitting planning doc for project:', projectId);
@@ -536,6 +848,20 @@ class MissionControlAgent extends EventEmitter {
       }
       
       const result = await response.json();
+      
+      // Save to git
+      if (this.config.enableGitCoordination) {
+        const planPath = path.join(
+          this.config.sharedWorkspace,
+          'projects',
+          projectId,
+          'planning',
+          `${new Date().toISOString().split('T')[0]}-plan.md`
+        );
+        fs.mkdirSync(path.dirname(planPath), { recursive: true });
+        fs.writeFileSync(planPath, typeof planningDoc === 'string' ? planningDoc : JSON.stringify(planningDoc, null, 2));
+      }
+      
       this.emit('planning:submitted', { projectId, planningDoc: result });
       return result;
       
@@ -576,6 +902,20 @@ class MissionControlAgent extends EventEmitter {
       }
       
       const result = await response.json();
+      
+      // Save to git
+      if (this.config.enableGitCoordination) {
+        const summaryPath = path.join(
+          this.config.sharedWorkspace,
+          'projects',
+          projectId,
+          'summaries',
+          `${new Date().toISOString().split('T')[0]}-summary.md`
+        );
+        fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
+        fs.writeFileSync(summaryPath, typeof summaryReport === 'string' ? summaryReport : JSON.stringify(summaryReport, null, 2));
+      }
+      
       this.emit('project:summary_submitted', { projectId, summaryReport: result });
       return result;
       
@@ -614,6 +954,13 @@ class MissionControlAgent extends EventEmitter {
     }
   }
 
+  _stopGitPolling() {
+    if (this.gitPollTimer) {
+      clearInterval(this.gitPollTimer);
+      this.gitPollTimer = null;
+    }
+  }
+
   stopPolling() {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
@@ -624,6 +971,7 @@ class MissionControlAgent extends EventEmitter {
   disconnect() {
     this.stopHeartbeat();
     this.stopPolling();
+    this._stopGitPolling();
     
     if (this.socket) {
       this.socket.disconnect();

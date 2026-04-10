@@ -1,237 +1,311 @@
-# Mission Control Agent Client SDK v2.0
+# Mission Control Agent SDK v3.0
 
-WebSocket/SSE-based agent client for connecting to Mission Control dashboard.
+## Overview
 
-## Quick Start
+The enhanced Agent SDK now includes **built-in git coordination**. Agents connecting to your Mission Control instance automatically get multi-agent collaboration features.
+
+## What's New in v3.0
+
+### Automatic Git Coordination
+- Auto-sync workspace on connect
+- Auto-pull updates when idle
+- Automatic trigger/handoff creation on task events
+- Project status file updates
+
+### New Methods
+
+| Method | Description |
+|--------|-------------|
+| `initialize()` | Setup workspace + connect |
+| `createTrigger(projectId, type, message)` | Notify other agents |
+| `createHandoff(projectId, targetAgent, summary, details)` | Pass work to specific agent |
+| `updateProjectStatus(projectId, updates)` | Update shared STATUS.md |
+| `syncWorkspace()` | Manual git pull |
+
+### New Events
+
+| Event | When Fired |
+|-------|------------|
+| `coordination:updates_available` | Other agents pushed changes |
+| `coordination:synced` | Auto-pull completed |
+
+## Quick Start for Agents
+
+### 1. Install SDK
+
+```bash
+# Download from your hosted Mission Control
+wget https://your-mission-control.vercel.app/agent-sdk/mission-control-agent.js
+npm install socket.io-client
+```
+
+### 2. Basic Connection
 
 ```javascript
-const { MissionControlAgent } = require('@mission-control/agent-client');
+const { MissionControlAgent } = require('./mission-control-agent.js');
 
 const agent = new MissionControlAgent({
-  missionControlUrl: 'https://mission-control-sage-mu.vercel.app',
-  apiKey: 'your-api-key-here',
-  agentId: 'your-agent-id-here', // Optional, will register if not provided
-  capabilities: ['ETL', 'Python', 'ML'],
+  missionControlUrl: 'https://your-mission-control.vercel.app',
+  apiKey: process.env.MISSION_CONTROL_API_KEY,
+  handle: 'agent-1',
+  name: 'Developer Agent',
+  role: 'Full Stack Developer',
+  capabilities: ['typescript', 'react', 'node', 'prisma'],
+  sharedWorkspace: '/opt/shared-workspace',
+  enableGitCoordination: true
 });
 
-// Connect and start
-await agent.connect();
+// Initialize sets up workspace and connects
+await agent.initialize();
+```
 
-// Handle incoming tasks
+### 3. Handle Tasks with Coordination
+
+```javascript
 agent.onTask(async (task) => {
-  console.log('Received task:', task);
+  console.log(`[${agent.config.handle}] Task assigned:`, task.title);
   
-  // Report progress
-  agent.reportProgress(task.id, 25);
+  // 1. Update shared status
+  await agent.updateProjectStatus(task.projectId, 
+    `- Task ${task.id} in progress by ${agent.config.handle}`
+  );
   
-  // Do the work...
-  const result = await doWork(task);
+  // 2. Do the work...
+  const result = await executeTask(task);
   
-  // Complete with summary report
+  // 3. Report progress (automatically saved to git)
+  agent.reportProgress(task.id, 50, { phase: 'testing' });
+  
+  // 4. Complete with summary
   await agent.completeTask(task.id, result, {
     outcome: 'success',
-    duration: 3600000,
-    notes: 'Task completed with optimizations',
-    deliverables: ['code', 'docs'],
+    notes: 'Implemented feature with tests',
+    artifacts: ['src/feature.ts', 'tests/feature.test.ts']
   });
-});
-
-// Handle kill switch
-agent.onKill(() => {
-  console.log('Kill switch activated!');
-  process.exit(0);
-});
-
-// Handle planning doc requirement
-agent.onPlanningRequired(async (task) => {
-  console.log('Task requires planning doc:', task.id);
-  // Create and submit planning document
-  await agent.submitPlanningDoc(task.projectId, {
-    scope: 'Implement feature X',
-    approach: 'Use library Y with pattern Z',
-    estimatedHours: 8,
-    risks: ['Dependency version mismatch'],
-    deliverables: ['Code', 'Tests', 'Documentation'],
-  });
+  
+  // 5. Create trigger for other agents (auto-committed)
+  await agent.createTrigger(task.projectId, 'task-completed', 
+    `Feature ready for review`
+  );
 });
 ```
 
-## Configuration
+### 4. Handoff to Another Agent
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `missionControlUrl` | ✅ | - | Mission Control dashboard URL |
-| `apiKey` | ✅ | - | Agent API key from dashboard |
-| `agentId` | ❌ | null | Existing agent ID (auto-registered if not provided) |
-| `heartbeatInterval` | ❌ | 30000 | Heartbeat interval in ms |
-| `pollInterval` | ❌ | 30000 | Task polling interval (SSE mode) |
-| `capabilities` | ❌ | [] | Array of agent capabilities |
-| `useWebSocket` | ❌ | true | Use WebSocket (falls back to SSE) |
-
-## Task Claiming
-
-The agent can receive tasks in two ways:
-
-### 1. Push (WebSocket/SSE)
-Mission Control assigns tasks directly to the agent:
 ```javascript
+// When you need to pass work
+await agent.createHandoff(
+  'my-project',
+  'agent-2',  // target agent
+  'Backend API implemented, needs frontend integration',
+  {
+    context: 'All endpoints tested and documented',
+    files: ['src/api/routes.ts', 'docs/api.md'],
+    questions: 'Should we add rate limiting now or later?'
+  }
+);
+```
+
+## Role-Based Task Distribution
+
+Agents declare roles and capabilities. Mission Control assigns tasks accordingly:
+
+```javascript
+// Agent 1 - Frontend specialist
+const frontendAgent = new MissionControlAgent({
+  handle: 'agent-1',
+  role: 'Frontend Developer',
+  capabilities: ['react', 'typescript', 'tailwind', 'ui-design']
+});
+
+// Agent 2 - Backend specialist
+const backendAgent = new MissionControlAgent({
+  handle: 'agent-2', 
+  role: 'Backend Developer',
+  capabilities: ['node', 'prisma', 'postgresql', 'api-design']
+});
+
+// Agent 3 - DevOps
+const devopsAgent = new MissionControlAgent({
+  handle: 'agent-3',
+  role: 'DevOps Engineer',
+  capabilities: ['docker', 'kubernetes', 'ci-cd', 'aws']
+});
+```
+
+Tasks specify required capabilities:
+
+```javascript
+// Task in Mission Control
+{
+  id: "task-123",
+  title: "Build user dashboard",
+  requiredCapabilities: ['react', 'typescript'],
+  // Only agent-1 can claim this
+}
+```
+
+## Environment Variables
+
+```bash
+# Required
+export MISSION_CONTROL_URL="https://your-app.vercel.app"
+export MISSION_CONTROL_API_KEY="your-api-key"
+export AGENT_NAME="agent-1"
+
+# For git coordination
+export SHARED_WORKSPACE="/opt/shared-workspace"
+
+# Optional
+export AGENT_CAPABILITIES="typescript,react,node"
+export AGENT_ROLE="Developer"
+```
+
+## Project Structure (Auto-Created)
+
+```
+/opt/shared-workspace/
+├── projects/
+│   └── my-project/
+│       ├── STATUS.md              # Auto-updated
+│       ├── handoffs/              # Handoff files auto-created
+│       ├── triggers/              # Trigger files auto-created
+│       ├── planning/              # Planning docs auto-saved
+│       └── summaries/             # Summary reports auto-saved
+└── agents/
+    └── agent-1/
+        ├── capabilities.json      # Auto-written on init
+        └── current-task.json      # Auto-updated
+```
+
+## How Coordination Works
+
+### Automatic (No Code Required)
+
+1. **On connect** → Workspace synced (git pull)
+2. **Task assigned** → Current task saved to disk
+3. **Progress reported** → Checkpoints saved to disk
+4. **Task completed** → Trigger auto-created and pushed
+5. **Idle polling** → Auto-pull every 60s for updates
+
+### Manual (When Needed)
+
+```javascript
+// Create handoff to specific agent
+await agent.createHandoff(projectId, targetAgent, summary, details);
+
+// Update project status
+await agent.updateProjectStatus(projectId, markdownContent);
+
+// Create custom trigger
+await agent.createTrigger(projectId, 'blocked', 'Need API credentials');
+
+// Force sync
+await agent.syncWorkspace();
+```
+
+## Example: 5-Agent Workflow
+
+```javascript
+// agents.js - Run on each VPS
+
+const { MissionControlAgent } = require('./mission-control-agent.js');
+
+const agent = new MissionControlAgent({
+  missionControlUrl: process.env.MISSION_CONTROL_URL,
+  apiKey: process.env.MISSION_CONTROL_API_KEY,
+  handle: process.env.AGENT_NAME,
+  name: process.env.AGENT_NAME,
+  role: process.env.AGENT_ROLE,
+  capabilities: process.env.AGENT_CAPABILITIES?.split(',') || [],
+  sharedWorkspace: process.env.SHARED_WORKSPACE,
+  enableGitCoordination: true
+});
+
 agent.onTask(async (task) => {
-  // Task received, start working
+  console.log(`[${agent.config.handle}] Starting: ${task.title}`);
+  
+  // Check for handoffs from previous agent
+  const handoffs = fs.readdirSync(
+    `${process.env.SHARED_WORKSPACE}/projects/${task.projectId}/handoffs`
+  ).filter(f => f.includes(`to-${agent.config.handle}`));
+  
+  if (handoffs.length > 0) {
+    console.log(`Found ${handoffs.length} handoff(s) to review`);
+    // Read handoff content...
+  }
+  
+  // Execute task based on role
+  const result = await executeByRole(task, agent.config.role);
+  
+  // Complete and notify
+  await agent.completeTask(task.id, result, {
+    outcome: 'success',
+    notes: `Completed by ${agent.config.role}`,
+    completedBy: agent.config.handle
+  });
 });
+
+// Handle coordination events
+agent.on('coordination:updates_available', () => {
+  console.log('[Agent] Updates from other agents available');
+});
+
+agent.on('coordination:synced', () => {
+  console.log('[Agent] Workspace synced with team');
+});
+
+// Start
+await agent.initialize();
+console.log(`[${agent.config.handle}] Ready for tasks`);
+
+// Role-based execution
+async function executeByRole(task, role) {
+  switch (role) {
+    case 'Architect':
+      return await designSystem(task);
+    case 'Backend Developer':
+      return await implementAPI(task);
+    case 'Frontend Developer':
+      return await buildUI(task);
+    case 'QA Engineer':
+      return await runTests(task);
+    case 'DevOps Engineer':
+      return await deploy(task);
+    default:
+      throw new Error(`Unknown role: ${role}`);
+  }
+}
 ```
 
-### 2. Pull (Polling)
-Agent polls for available tasks:
+## Troubleshooting
+
+### "Git sync warning"
+
+Git coordination is optional. Agent continues working with Mission Control API only.
+
+### "Failed to push trigger"
+
+Another agent may have pushed changes. Agent will retry on next event.
+
+### Multiple agents claim same task
+
+Mission Control prevents this with atomic claim operations. Only one succeeds.
+
+## Migration from v2.0
+
 ```javascript
-// Automatic in SSE mode
-// Agent checks /api/tasks?status=READY every 30s
-// Claims matching task by capabilities
+// Old (v2.0)
+const agent = new MissionControlAgent(config);
+await agent.connect();
+
+// New (v3.0)
+const agent = new MissionControlAgent({
+  ...config,
+  sharedWorkspace: '/opt/shared-workspace',
+  enableGitCoordination: true
+});
+await agent.initialize(); // Replaces connect(), sets up workspace
 ```
 
-## Planning Documents
-
-**No task can start without an approved planning document.**
-
-```javascript
-// Submit planning doc for a project
-await agent.submitPlanningDoc('project-id', {
-  scope: 'What will be built',
-  approach: 'How it will be built',
-  estimatedHours: 8,
-  requiredTools: ['github', 'aws'],
-  dependencies: ['task-001', 'task-002'],
-  risks: ['Potential issues'],
-  deliverables: ['Code', 'Tests', 'Docs'],
-  validationCriteria: ['Tests pass', 'Performance > 100req/s'],
-});
-
-// Handle tasks that require planning
-agent.onPlanningRequired(async (task) => {
-  // Create planning doc before starting task
-  await agent.submitPlanningDoc(task.projectId, planningDoc);
-});
-```
-
-## Progress Tracking
-
-```javascript
-// Report progress during task execution
-agent.reportProgress(taskId, 25);  // 25% complete
-
-// Report with metadata
-agent.reportProgress(taskId, 50, {
-  stage: 'testing',
-  message: 'Running integration tests',
-});
-```
-
-## Summary Reports
-
-**Required on task/project completion:**
-
-```javascript
-// Task completion with summary
-await agent.completeTask(taskId, result, {
-  outcome: 'success',  // or 'partial', 'cancelled'
-  duration: 3600000,   // milliseconds
-  notes: 'Detailed summary of what was done',
-  deliverables: ['file1.js', 'file2.md'],
-  metrics: {
-    linesOfCode: 150,
-    testCoverage: 85,
-  },
-  blockersEncountered: ['None'],
-  lessonsLearned: ['Use pattern X for better performance'],
-});
-
-// Project summary on completion
-await agent.submitProjectSummary('project-id', {
-  overview: 'Project achieved goals X, Y, Z',
-  outcomes: {
-    goalsMet: 3,
-    goalsPartial: 1,
-    goalsMissed: 0,
-  },
-  timeline: {
-    plannedDuration: '2 weeks',
-    actualDuration: '2.5 weeks',
-  },
-  budget: {
-    allocated: 10000,
-    spent: 9500,
-  },
-  deliverables: ['Feature A', 'Feature B', 'Documentation'],
-  risks: {
-    identified: 5,
-    mitigated: 4,
-    realized: 1,
-  },
-  lessonsLearned: [
-    'Lesson 1: Do X instead of Y',
-    'Lesson 2: Start testing earlier',
-  ],
-  recommendations: [
-    'Consider refactoring Z',
-    'Add monitoring for metric W',
-  ],
-});
-```
-
-## API
-
-### `connect()`
-Connects to Mission Control via WebSocket (falls back to SSE).
-
-### `onTask(callback)`
-Register handler for task assignments.
-
-### `onKill(callback)`
-Register handler for kill switch.
-
-### `onPlanningRequired(callback)`
-Register handler for tasks requiring planning documents.
-
-### `claimTask(taskId)`
-Manually claim a specific task.
-
-### `reportProgress(taskId, percent, metadata?)`
-Report task progress (0-100).
-
-### `completeTask(taskId, result, summaryReport?)`
-Mark task complete with optional summary report.
-
-### `failTask(taskId, error, summaryReport?)`
-Mark task failed with error and optional summary.
-
-### `submitPlanningDoc(projectId, planningDoc)`
-Submit planning document for project.
-
-### `submitProjectSummary(projectId, summaryReport)`
-Submit summary report for completed project.
-
-### `disconnect()`
-Clean disconnect from Mission Control.
-
-## Database Storage
-
-**All data lives in the database:**
-
-- ✅ Agent registration & API keys
-- ✅ Task assignments & status
-- ✅ Planning documents (JSON in Project table)
-- ✅ Summary reports (JSON in Task/Project tables)
-- ✅ Progress checkpoints
-- ✅ Heartbeat history
-- ✅ Audit logs
-
-## Download
-
-From Dashboard → Agents → "Download Agent SDK"
-
-Or direct download:
-- SDK: `/agent-sdk/mission-control-agent.js`
-- Docs: `/agent-sdk/README.md`
-
-## License
-
-MIT - Part of Mission Control project
+All v2.0 methods still work. Coordination features are additive.
