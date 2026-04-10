@@ -174,7 +174,7 @@ async function detectHungTasks(now: Date): Promise<{
           id: task.id,
           title: task.title,
           status: 'FAILED',
-          reason: retryResult.reason,
+          reason: retryResult.reason || 'Retry failed',
         });
       }
     } else {
