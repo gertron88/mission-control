@@ -44,7 +44,7 @@ async function resetDailyTaskLimits(now: Date): Promise<{
     where: {
       OR: [
         { lastTaskDate: { lt: today } },
-        { lastTaskDate: null },
+        { lastTaskDate: { equals: null } },
       ],
     },
     select: {
@@ -133,10 +133,7 @@ async function resetTradingLimits(now: Date): Promise<{
 
   const configs = await prisma.tradingConfig.findMany({
     where: {
-      OR: [
-        { lastResetDate: { lt: today } },
-        { lastResetDate: null },
-      ],
+      lastResetDate: { lt: today },
     },
     select: {
       id: true,
