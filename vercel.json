@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/staleness-check",
-      "schedule": "0 * * * *"
+      "schedule": "0 12 * * *"
     }
   ],
   "functions": {
