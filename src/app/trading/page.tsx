@@ -39,6 +39,7 @@ export default function TradingPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [scannerEvents, setScannerEvents] = useState<ScannerEvent[]>([]);
   const [sseStatus, setSseStatus] = useState<'connecting' | 'live' | 'disconnected'>('connecting');
+  const [selectedEvent, setSelectedEvent] = useState<ScannerEvent | null>(null);
   const sseRef = useRef<EventSource | null>(null);
 
   // Fetch static data once
@@ -356,15 +357,20 @@ export default function TradingPage() {
             {scannerEvents.slice(0, 50).map((event) => {
               const fmt = formatScannerEvent(event);
               return (
-                <div key={event.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px',
-                  background: 'rgba(15, 23, 42, 0.4)',
-                  borderRadius: '8px',
-                  borderLeft: `3px solid ${fmt.color}`
-                }}>
+                <div
+                  key={event.id}
+                  onClick={() => setSelectedEvent(event)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px',
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    borderRadius: '8px',
+                    borderLeft: `3px solid ${fmt.color}`,
+                    cursor: 'pointer',
+                  }}
+                >
                   <div style={{
                     width: '8px',
                     height: '8px',
@@ -386,6 +392,87 @@ export default function TradingPage() {
           </div>
         )}
       </div>
+
+      {/* Scanner Event Detail Modal */}
+      {selectedEvent && (
+        <div
+          onClick={() => setSelectedEvent(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1e293b',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '640px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: formatScannerEvent(selectedEvent).color
+              }} />
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>
+                {formatScannerEvent(selectedEvent).title}
+              </h2>
+              <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace' }}>
+                {new Date(selectedEvent.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
+
+            <div style={{
+              background: '#0f172a',
+              borderRadius: '10px',
+              padding: '16px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+              color: '#94a3b8',
+              overflowX: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}>
+              {JSON.stringify(selectedEvent.payload, null, 2)}
+            </div>
+
+            {selectedEvent.agentName && (
+              <p style={{ marginTop: '12px', fontSize: '12px', color: '#64748b' }}>
+                Agent: <span style={{ color: '#e2e8f0' }}>{selectedEvent.agentName}</span>
+              </p>
+            )}
+
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setSelectedEvent(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(71, 85, 105, 0.5)',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
