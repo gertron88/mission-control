@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { TrendingUp, TrendingDown, DollarSign, Activity, AlertTriangle, Clock, ScanLine } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Activity, Clock, ScanLine } from 'lucide-react';
 
 interface Position {
   id: string;
@@ -28,7 +28,8 @@ interface Trade {
 interface ScannerEvent {
   id: string;
   type: string;
-  agentId: string;
+  agentId?: string;
+  agentName?: string;
   payload: any;
   timestamp: string;
 }
@@ -37,20 +38,17 @@ export default function TradingPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [scannerEvents, setScannerEvents] = useState<ScannerEvent[]>([]);
-  const [stats, setStats] = useState({
-    totalPnl: 0,
-    openPositions: 0,
-    totalTrades: 0,
-    winRate: 0
-  });
+  const [sseStatus, setSseStatus] = useState<'connecting' | 'live' | 'disconnected'>('connecting');
+  const sseRef = useRef<EventSource | null>(null);
 
+  // Fetch static data once
   useEffect(() => {
     async function fetchTradingData() {
       try {
         const [positionsRes, tradesRes, scannerRes] = await Promise.all([
           fetch('/api/trading/positions'),
           fetch('/api/trading/trades'),
-          fetch('/api/trading/scanner?limit=20')
+          fetch('/api/trading/scanner?limit=50')
         ]);
         
         if (positionsRes.ok) {
@@ -66,21 +64,63 @@ export default function TradingPage() {
           setScannerEvents(scannerData);
         }
       } catch (err) {
-        // Use empty data
         setPositions([]);
         setTrades([]);
-        setScannerEvents([]);
       }
     }
     fetchTradingData();
-    const interval = setInterval(fetchTradingData, 30000);
-    return () => clearInterval(interval);
+  }, []);
+
+  // Live SSE feed
+  useEffect(() => {
+    const es = new EventSource('/api/events');
+    sseRef.current = es;
+
+    es.onopen = () => setSseStatus('live');
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'ping' || data.type === 'connected') return;
+        if (
+          data.type === 'SCANNER_OPPORTUNITY' ||
+          data.type === 'SCANNER_MATCH' ||
+          data.type === 'SCANNER_HEARTBEAT' ||
+          data.type === 'SCANNER_LOG'
+        ) {
+          const evt: ScannerEvent = {
+            id: `${data.type}-${Date.now()}`,
+            type: data.type,
+            agentId: data.agentId,
+            agentName: data.agentName,
+            payload: data.payload,
+            timestamp: data.timestamp || new Date().toISOString(),
+          };
+          setScannerEvents((prev) => [evt, ...prev].slice(0, 100));
+        }
+      } catch {
+        // ignore malformed
+      }
+    };
+
+    es.onerror = () => {
+      setSseStatus('disconnected');
+      es.close();
+      // Auto-reconnect after 3s
+      setTimeout(() => {
+        setSseStatus('connecting');
+      }, 3000);
+    };
+
+    return () => {
+      es.close();
+    };
   }, []);
 
   const totalPnl = positions.reduce((sum, p) => sum + p.pnl, 0);
-  const opportunityCount = scannerEvents.filter(e => e.type === 'SCANNER_OPPORTUNITY').length;
-  const lastHeartbeat = scannerEvents.find(e => e.type === 'SCANNER_HEARTBEAT');
-  const lastMatch = scannerEvents.find(e => e.type === 'SCANNER_MATCH');
+  const opportunityCount = scannerEvents.filter((e) => e.type === 'SCANNER_OPPORTUNITY').length;
+  const lastHeartbeat = scannerEvents.find((e) => e.type === 'SCANNER_HEARTBEAT');
+  const lastMatch = scannerEvents.find((e) => e.type === 'SCANNER_MATCH');
 
   function formatScannerEvent(event: ScannerEvent): { title: string; detail: string; color: string } {
     switch (event.type) {
@@ -124,7 +164,7 @@ export default function TradingPage() {
           { label: 'Total P&L', value: `$${totalPnl.toFixed(2)}`, color: totalPnl >= 0 ? '#34d399' : '#f87171', icon: DollarSign },
           { label: 'Open Positions', value: positions.length.toString(), color: '#22d3ee', icon: Activity },
           { label: 'Total Trades', value: trades.length.toString(), color: '#fbbf24', icon: TrendingUp },
-          { label: 'Win Rate', value: `${stats.winRate}%`, color: '#a78bfa', icon: TrendingDown },
+          { label: 'Win Rate', value: `${0}%`, color: '#a78bfa', icon: TrendingDown },
         ].map((stat) => (
           <div key={stat.label} style={{
             background: 'rgba(30, 41, 59, 0.5)',
@@ -144,64 +184,62 @@ export default function TradingPage() {
       </div>
 
       {/* Scanner Status Bar */}
-      {(lastHeartbeat || lastMatch || opportunityCount > 0) && (
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '16px',
-          marginBottom: '24px'
+          background: 'rgba(30, 41, 59, 0.3)',
+          border: '1px solid rgba(71, 85, 105, 0.3)',
+          borderRadius: '12px',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
         }}>
-          <div style={{
-            background: 'rgba(30, 41, 59, 0.3)',
-            border: '1px solid rgba(71, 85, 105, 0.3)',
-            borderRadius: '12px',
-            padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <ScanLine className="w-5 h-5" style={{ color: '#22d3ee' }} />
-            <div>
-              <p style={{ fontSize: '11px', color: '#94a3b8' }}>Scanner Status</p>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
-                {lastHeartbeat ? 'Online' : 'No heartbeat'}
-              </p>
-            </div>
-          </div>
-          <div style={{
-            background: 'rgba(30, 41, 59, 0.3)',
-            border: '1px solid rgba(71, 85, 105, 0.3)',
-            borderRadius: '12px',
-            padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <Activity className="w-5 h-5" style={{ color: '#fbbf24' }} />
-            <div>
-              <p style={{ fontSize: '11px', color: '#94a3b8' }}>Opportunities (24h)</p>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>{opportunityCount}</p>
-            </div>
-          </div>
-          <div style={{
-            background: 'rgba(30, 41, 59, 0.3)',
-            border: '1px solid rgba(71, 85, 105, 0.3)',
-            borderRadius: '12px',
-            padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <TrendingUp className="w-5 h-5" style={{ color: '#34d399' }} />
-            <div>
-              <p style={{ fontSize: '11px', color: '#94a3b8' }}>Matched Pairs</p>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
-                {lastMatch?.payload?.matched_pairs ?? '-'}
-              </p>
-            </div>
+          <ScanLine className="w-5 h-5" style={{ color: sseStatus === 'live' ? '#34d399' : sseStatus === 'connecting' ? '#fbbf24' : '#f87171' }} />
+          <div>
+            <p style={{ fontSize: '11px', color: '#94a3b8' }}>Scanner Status</p>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
+              {sseStatus === 'live' ? 'Live Feed' : sseStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+            </p>
           </div>
         </div>
-      )}
+        <div style={{
+          background: 'rgba(30, 41, 59, 0.3)',
+          border: '1px solid rgba(71, 85, 105, 0.3)',
+          borderRadius: '12px',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <Activity className="w-5 h-5" style={{ color: '#fbbf24' }} />
+          <div>
+            <p style={{ fontSize: '11px', color: '#94a3b8' }}>Opportunities</p>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>{opportunityCount}</p>
+          </div>
+        </div>
+        <div style={{
+          background: 'rgba(30, 41, 59, 0.3)',
+          border: '1px solid rgba(71, 85, 105, 0.3)',
+          borderRadius: '12px',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <TrendingUp className="w-5 h-5" style={{ color: '#34d399' }} />
+          <div>
+            <p style={{ fontSize: '11px', color: '#94a3b8' }}>Matched Pairs</p>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
+              {lastMatch?.payload?.matched_pairs ?? '-'}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Positions & Recent Trades */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
@@ -306,7 +344,7 @@ export default function TradingPage() {
         padding: '20px'
       }}>
         <h3 style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
-          Scanner Log
+          Scanner Log {sseStatus === 'live' && <span style={{ color: '#34d399', fontSize: '10px', marginLeft: 8 }}>● LIVE</span>}
         </h3>
         {scannerEvents.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
@@ -315,7 +353,7 @@ export default function TradingPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {scannerEvents.slice(0, 30).map((event) => {
+            {scannerEvents.slice(0, 50).map((event) => {
               const fmt = formatScannerEvent(event);
               return (
                 <div key={event.id} style={{

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { broadcastEvent } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,20 @@ export async function POST(request: NextRequest) {
         afterState: payload,
         severity: type === 'SCANNER_HEARTBEAT' ? 'DEBUG' : 'INFO',
       },
+    });
+
+    // Broadcast to SSE subscribers for live UI updates
+    broadcastEvent({
+      type,
+      agentId,
+      agentName,
+      payload,
+      metadata: {
+        projectId,
+        source: 'polymarket-kalshi-arb',
+        receivedAt: new Date().toISOString(),
+      },
+      timestamp: new Date().toISOString(),
     });
 
     return NextResponse.json({ success: true, id: event.id });
