@@ -10,7 +10,8 @@ import {
   Bot,
   Cpu,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  TrendingUp
 } from 'lucide-react';
 
 interface NavItem {
@@ -83,6 +84,7 @@ export default function Sidebar() {
 
   const navItems: NavItem[] = [
     { path: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { path: '/trading', label: 'Trading', icon: <TrendingUp className="w-4 h-4" /> },
     { path: '/projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, badge: counts.projects },
     { path: '/tasks', label: 'Tasks', icon: <CheckSquare className="w-4 h-4" />, badge: counts.tasks, badgeColor: 'bg-red-500' },
     { path: '/agents', label: 'Agents', icon: <Bot className="w-4 h-4" />, badge: counts.agents },
@@ -201,36 +203,34 @@ export default function Sidebar() {
             Infrastructure
           </p>
         )}
-        {bottomNavItems.map((item) => (
-          <div
-            key={item.path}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '10px 12px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#64748b',
-              border: '1px solid transparent',
-              cursor: 'not-allowed',
-              opacity: 0.5,
-            }}
-          >
-            <div style={{ width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {item.icon}
-            </div>
-            {!collapsed && (
-              <>
-                <span style={{ flex: 1 }}>{item.label}</span>
-                <span style={{ fontSize: '9px', background: 'rgba(71, 85, 105, 0.5)', color: '#64748b', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Soon
-                </span>
-              </>
-            )}
-          </div>
-        ))}
+        {bottomNavItems.map((item) => {
+          const active = isActive(item.path);
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                whiteSpace: 'nowrap',
+                border: active ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid transparent',
+                background: active ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+                color: active ? '#67e8f9' : '#64748b',
+              }}
+            >
+              <div style={{ width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {item.icon}
+              </div>
+              {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* System status */}

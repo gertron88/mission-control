@@ -194,6 +194,7 @@ export default function AgentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
 
   useEffect(() => {
     async function fetchAgents() {
@@ -244,24 +245,6 @@ export default function AgentsPage() {
     <DashboardLayout
       title="Agents"
       subtitle={`${agents.length} total — ${onlineCount} online`}
-      actions={
-        <button style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          background: 'rgba(6, 182, 212, 0.15)',
-          border: '1px solid rgba(6, 182, 212, 0.3)',
-          color: '#67e8f9',
-          fontSize: '12px',
-          fontWeight: 600,
-          cursor: 'pointer',
-        }}>
-          <Plus className="w-4 h-4" />
-          Deploy Agent
-        </button>
-      }
     >
       {/* SDK Install Panel */}
       <SDKInstallPanel />
@@ -351,16 +334,21 @@ export default function AgentsPage() {
             : 'Unknown';
           
           return (
-            <div key={agent.id} style={{
-              background: 'rgba(30, 41, 59, 0.5)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(71, 85, 105, 0.4)',
-              borderRadius: '12px',
-              padding: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}>
+            <div
+              key={agent.id}
+              onClick={() => setSelectedAgent(agent)}
+              style={{
+                background: 'rgba(30, 41, 59, 0.5)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(71, 85, 105, 0.4)',
+                borderRadius: '12px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                cursor: 'pointer',
+              }}
+            >
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <div style={{
@@ -459,6 +447,106 @@ export default function AgentsPage() {
           );
         })}
       </div>
+      {/* Agent Detail Modal */}
+      {selectedAgent && (
+        <div
+          onClick={() => setSelectedAgent(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1e293b',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '480px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #06b6d4, #9333ea)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Bot className="w-6 h-6" style={{ color: 'white' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{selectedAgent.name}</h2>
+                <p style={{ fontSize: '12px', color: '#64748b' }}>{selectedAgent.handle}</p>
+              </div>
+              <span style={{
+                fontSize: '11px',
+                padding: '4px 10px',
+                borderRadius: '9999px',
+                background: statusConfig[selectedAgent.status].bg,
+                color: statusConfig[selectedAgent.status].color,
+                fontWeight: 600,
+              }}>{selectedAgent.status}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Role</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedAgent.role || 'Agent'}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Model</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedAgent.model}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Capabilities</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {selectedAgent.capabilities?.map((cap) => (
+                    <span key={cap} style={{
+                      fontSize: '10px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: 'rgba(71, 85, 105, 0.4)',
+                      color: '#cbd5e1',
+                    }}>{cap}</span>
+                  )) || <span style={{ fontSize: '12px', color: '#64748b' }}>No capabilities</span>}
+                </div>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Assigned Tasks</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedAgent._count?.assignedTasks || 0}</p>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setSelectedAgent(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(71, 85, 105, 0.5)',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

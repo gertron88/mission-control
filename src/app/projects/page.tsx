@@ -35,6 +35,8 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     async function fetchProjects() {
@@ -85,19 +87,22 @@ export default function ProjectsPage() {
       title="Projects"
       subtitle={`${projects.length} total — ${executingCount} executing`}
       actions={
-        <button style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          background: 'rgba(6, 182, 212, 0.15)',
-          border: '1px solid rgba(6, 182, 212, 0.3)',
-          color: '#67e8f9',
-          fontSize: '12px',
-          fontWeight: 600,
-          cursor: 'pointer',
-        }}>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            background: 'rgba(6, 182, 212, 0.15)',
+            border: '1px solid rgba(6, 182, 212, 0.3)',
+            color: '#67e8f9',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
           <Plus className="w-4 h-4" />
           New Project
         </button>
@@ -151,12 +156,17 @@ export default function ProjectsPage() {
           const budgetPercent = budgetTotal > 0 ? Math.round((budgetUsed / budgetTotal) * 100) : 0;
           
           return (
-            <div key={project.id} style={{
-              background: 'rgba(30, 41, 59, 0.5)',
-              border: '1px solid rgba(71, 85, 105, 0.4)',
-              borderRadius: '12px',
-              padding: '20px',
-            }}>
+            <div
+              key={project.id}
+              onClick={() => setSelectedProject(project)}
+              style={{
+                background: 'rgba(30, 41, 59, 0.5)',
+                border: '1px solid rgba(71, 85, 105, 0.4)',
+                borderRadius: '12px',
+                padding: '20px',
+                cursor: 'pointer',
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'white' }}>{project.name}</h3>
                 <span style={{
@@ -247,6 +257,174 @@ export default function ProjectsPage() {
           <FolderKanban className="w-12 h-12" style={{ marginBottom: '16px', opacity: 0.5 }} />
           <p style={{ fontSize: '16px', marginBottom: '8px' }}>No projects found</p>
           <p style={{ fontSize: '13px' }}>Create a new project to get started</p>
+        </div>
+      )}
+      {/* Project Detail Modal */}
+      {selectedProject && (
+        <div
+          onClick={() => setSelectedProject(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1e293b',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '560px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{selectedProject.name}</h2>
+              <span style={{
+                padding: '4px 10px',
+                borderRadius: '9999px',
+                fontSize: '10px',
+                background: selectedProject.state === 'EXECUTING' ? 'rgba(6, 182, 212, 0.15)' :
+                           selectedProject.state === 'COMPLETE' ? 'rgba(16, 185, 129, 0.15)' :
+                           'rgba(71, 85, 105, 0.3)',
+                color: selectedProject.state === 'EXECUTING' ? '#22d3ee' :
+                       selectedProject.state === 'COMPLETE' ? '#34d399' :
+                       '#94a3b8',
+              }}>{selectedProject.state}</span>
+            </div>
+            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px', lineHeight: 1.5 }}>
+              {selectedProject.description || 'No description'}
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Portfolio</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedProject.portfolio.name}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Tasks</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedProject._count.tasks} open</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Progress</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedProject.progress}%</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Budget</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>
+                  ${(selectedProject.budgetSpent || 0).toLocaleString()} / ${(selectedProject.budgetAllocated || 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {selectedProject.tasks.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px' }}>Recent Tasks</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {selectedProject.tasks.slice(0, 5).map((t) => (
+                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(15,23,42,0.5)', borderRadius: '6px' }}>
+                      <span style={{ fontSize: '12px', color: '#e2e8f0' }}>#{t.number} {t.title}</span>
+                      <span style={{ fontSize: '10px', color: t.status === 'BLOCKED' ? '#f87171' : '#94a3b8' }}>{t.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setSelectedProject(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(71, 85, 105, 0.5)',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Project Info Modal */}
+      {showCreateModal && (
+        <div
+          onClick={() => setShowCreateModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1e293b',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '520px',
+              width: '100%',
+            }}
+          >
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>Create a Project</h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px', lineHeight: 1.5 }}>
+              Projects are created via the API by authenticated agents or integrations.
+            </p>
+            <div style={{
+              background: '#0f172a',
+              borderRadius: '8px',
+              padding: '12px',
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              color: '#22d3ee',
+              overflowX: 'auto',
+              whiteSpace: 'pre-wrap',
+              marginBottom: '20px',
+            }}
+            >
+{`POST /api/projects
+Body:
+{
+  "portfolioId": "...",
+  "name": "New Project",
+  "description": "...",
+  "charter": "...",
+  "budgetAllocated": 10000
+}`}
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(71, 85, 105, 0.5)',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >Close</button>
+            </div>
+          </div>
         </div>
       )}
     </DashboardLayout>

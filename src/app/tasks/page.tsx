@@ -85,6 +85,8 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     async function fetchTasks() {
@@ -136,19 +138,22 @@ export default function TasksPage() {
       title="Tasks"
       subtitle={`${tasks.length} total — ${runningCount} running`}
       actions={
-        <button style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          background: 'rgba(6, 182, 212, 0.15)',
-          border: '1px solid rgba(6, 182, 212, 0.3)',
-          color: '#67e8f9',
-          fontSize: '12px',
-          fontWeight: 600,
-          cursor: 'pointer',
-        }}>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            background: 'rgba(6, 182, 212, 0.15)',
+            border: '1px solid rgba(6, 182, 212, 0.3)',
+            color: '#67e8f9',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
           <Plus className="w-4 h-4" />
           New Task
         </button>
@@ -252,14 +257,18 @@ export default function TasksPage() {
               {/* Tasks */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {colTasks.map((task) => (
-                  <div key={task.id} style={{
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(71, 85, 105, 0.4)',
-                    borderRadius: '10px',
-                    padding: '14px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}>
+                  <div
+                    key={task.id}
+                    onClick={() => setSelectedTask(task)}
+                    style={{
+                      background: 'rgba(30, 41, 59, 0.8)',
+                      border: '1px solid rgba(71, 85, 105, 0.4)',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <span style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>#{task.number}</span>
@@ -335,6 +344,154 @@ export default function TasksPage() {
           );
         })}
       </div>
+      {/* Task Detail Modal */}
+      {selectedTask && (
+        <div
+          onClick={() => setSelectedTask(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1e293b',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '520px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '12px', color: '#64748b', fontFamily: 'monospace' }}>#{selectedTask.number}</span>
+              <span style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                background: `${priorityColors[selectedTask.priority]}20`,
+                color: priorityColors[selectedTask.priority],
+              }}>{selectedTask.priority}</span>
+              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#334155', color: '#e2e8f0' }}>{selectedTask.status}</span>
+            </div>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>{selectedTask.title}</h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px', lineHeight: 1.5 }}>{selectedTask.description}</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Project</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedTask.project.name}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Assignee</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{selectedTask.assignee?.name || 'Unassigned'}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Due</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{formatDueDate(selectedTask.dueDate)}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Effort</p>
+                <p style={{ fontSize: '13px', color: '#e2e8f0' }}>Est: {selectedTask.estimatedEffort ?? '—'}h {selectedTask.actualEffort ? `• Actual: ${selectedTask.actualEffort}h` : ''}</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setSelectedTask(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(71, 85, 105, 0.5)',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Task Info Modal */}
+      {showCreateModal && (
+        <div
+          onClick={() => setShowCreateModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1e293b',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '520px',
+              width: '100%',
+            }}
+          >
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>Create a Task</h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px', lineHeight: 1.5 }}>
+              Tasks are created by agents through the API. Any connected agent can create a task for itself or another agent.
+            </p>
+            <div style={{
+              background: '#0f172a',
+              borderRadius: '8px',
+              padding: '12px',
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              color: '#22d3ee',
+              overflowX: 'auto',
+              whiteSpace: 'pre-wrap',
+              marginBottom: '20px',
+            }}>
+{`POST /api/tasks/create
+Headers: x-api-key: YOUR_AGENT_API_KEY
+Body:
+{
+  "title": "My new task",
+  "description": "What needs to be done",
+  "projectId": "...",
+  "priority": "HIGH"
+}`}
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(71, 85, 105, 0.5)',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

@@ -1,6 +1,6 @@
+import Link from 'next/link'
 import { getDashboardStats } from './actions'
 import StatusCards from '@/components/dashboard/StatusCards'
-import { formatDistanceToNow } from 'date-fns'
 
 export default async function DashboardPage() {
   const { projects, tasks, agents, stats } = await getDashboardStats()
@@ -38,11 +38,13 @@ export default async function DashboardPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {tasks.map((task) => (
-                <div key={task.id} style={{
+                <Link key={task.id} href={`/tasks`} style={{ textDecoration: 'none' }}>
+                <div style={{
                   padding: '12px',
                   background: 'rgba(15, 23, 42, 0.5)',
                   borderRadius: '8px',
                   borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
+                  cursor: 'pointer',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ color: '#f8fafc', fontWeight: 500 }}>{task.title}</span>
@@ -60,6 +62,7 @@ export default async function DashboardPage() {
                     {task.project?.name || 'No project'} • {task.assignee?.handle || 'Unassigned'}
                   </p>
                 </div>
+                </Link>
               ))}
             </div>
           )}
@@ -86,10 +89,12 @@ export default async function DashboardPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {projects.map((project) => (
-                <div key={project.id} style={{
+                <Link key={project.id} href={`/projects`} style={{ textDecoration: 'none' }}>
+                <div style={{
                   padding: '12px',
                   background: 'rgba(15, 23, 42, 0.5)',
                   borderRadius: '8px',
+                  cursor: 'pointer',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ color: '#f8fafc', fontWeight: 500 }}>{project.name}</span>
@@ -115,6 +120,7 @@ export default async function DashboardPage() {
                     ${project.budgetSpent?.toString() || 0} / ${project.budgetAllocated?.toString() || 0}
                   </p>
                 </div>
+                </Link>
               ))}
             </div>
           )}
@@ -141,13 +147,15 @@ export default async function DashboardPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {agents.map((agent) => (
-                <div key={agent.id} style={{
+                <Link key={agent.id} href={`/agents`} style={{ textDecoration: 'none' }}>
+                <div style={{
                   padding: '12px',
                   background: 'rgba(15, 23, 42, 0.5)',
                   borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
+                  cursor: 'pointer',
                 }}>
                   <div style={{
                     width: '10px',
@@ -171,6 +179,7 @@ export default async function DashboardPage() {
                     {agent.status}
                   </span>
                 </div>
+                </Link>
               ))}
             </div>
           )}
