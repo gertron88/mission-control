@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { TrendingUp, TrendingDown, DollarSign, Activity, AlertTriangle, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Activity, AlertTriangle, Clock, ScanLine } from 'lucide-react';
 
 interface Position {
   id: string;
@@ -25,9 +25,18 @@ interface Trade {
   agent: string;
 }
 
+interface ScannerEvent {
+  id: string;
+  type: string;
+  agentId: string;
+  payload: any;
+  timestamp: string;
+}
+
 export default function TradingPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [scannerEvents, setScannerEvents] = useState<ScannerEvent[]>([]);
   const [stats, setStats] = useState({
     totalPnl: 0,
     openPositions: 0,
@@ -38,9 +47,10 @@ export default function TradingPage() {
   useEffect(() => {
     async function fetchTradingData() {
       try {
-        const [positionsRes, tradesRes] = await Promise.all([
+        const [positionsRes, tradesRes, scannerRes] = await Promise.all([
           fetch('/api/trading/positions'),
-          fetch('/api/trading/trades')
+          fetch('/api/trading/trades'),
+          fetch('/api/trading/scanner?limit=20')
         ]);
         
         if (positionsRes.ok) {
@@ -51,16 +61,57 @@ export default function TradingPage() {
           const tradeData = await tradesRes.json();
           setTrades(tradeData);
         }
+        if (scannerRes.ok) {
+          const scannerData = await scannerRes.json();
+          setScannerEvents(scannerData);
+        }
       } catch (err) {
         // Use empty data
         setPositions([]);
         setTrades([]);
+        setScannerEvents([]);
       }
     }
     fetchTradingData();
+    const interval = setInterval(fetchTradingData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const totalPnl = positions.reduce((sum, p) => sum + p.pnl, 0);
+  const opportunityCount = scannerEvents.filter(e => e.type === 'SCANNER_OPPORTUNITY').length;
+  const lastHeartbeat = scannerEvents.find(e => e.type === 'SCANNER_HEARTBEAT');
+  const lastMatch = scannerEvents.find(e => e.type === 'SCANNER_MATCH');
+
+  function formatScannerEvent(event: ScannerEvent): { title: string; detail: string; color: string } {
+    switch (event.type) {
+      case 'SCANNER_OPPORTUNITY':
+        return {
+          title: 'Opportunity',
+          detail: `${event.payload.side_a || '?'}+${event.payload.side_b || '?'} | net ${(event.payload.net_profit_pct * 100).toFixed(2)}% | ${event.payload.verified ? 'verified' : 'unverified'}`,
+          color: event.payload.verified ? '#34d399' : '#fbbf24'
+        };
+      case 'SCANNER_MATCH':
+        return {
+          title: 'Match Summary',
+          detail: `PM: ${event.payload.polymarket_markets || 0} | Kalshi: ${event.payload.kalshi_markets || 0} | matched: ${event.payload.matched_pairs || 0}`,
+          color: '#22d3ee'
+        };
+      case 'SCANNER_HEARTBEAT':
+        return {
+          title: 'Scanner Heartbeat',
+          detail: `pairs tracked: ${event.payload.matched_pairs ?? '-'}`,
+          color: '#94a3b8'
+        };
+      case 'SCANNER_LOG':
+        return {
+          title: 'Scan Cycle',
+          detail: `${event.payload.opportunities_found || 0} opportunities`,
+          color: '#a78bfa'
+        };
+      default:
+        return { title: event.type, detail: 'Scanner event', color: '#94a3b8' };
+    }
+  }
 
   return (
     <DashboardLayout
@@ -92,8 +143,68 @@ export default function TradingPage() {
         ))}
       </div>
 
+      {/* Scanner Status Bar */}
+      {(lastHeartbeat || lastMatch || opportunityCount > 0) && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '16px',
+          marginBottom: '24px'
+        }}>
+          <div style={{
+            background: 'rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(71, 85, 105, 0.3)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <ScanLine className="w-5 h-5" style={{ color: '#22d3ee' }} />
+            <div>
+              <p style={{ fontSize: '11px', color: '#94a3b8' }}>Scanner Status</p>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
+                {lastHeartbeat ? 'Online' : 'No heartbeat'}
+              </p>
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(71, 85, 105, 0.3)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <Activity className="w-5 h-5" style={{ color: '#fbbf24' }} />
+            <div>
+              <p style={{ fontSize: '11px', color: '#94a3b8' }}>Opportunities (24h)</p>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>{opportunityCount}</p>
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(71, 85, 105, 0.3)',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <TrendingUp className="w-5 h-5" style={{ color: '#34d399' }} />
+            <div>
+              <p style={{ fontSize: '11px', color: '#94a3b8' }}>Matched Pairs</p>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
+                {lastMatch?.payload?.matched_pairs ?? '-'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Positions & Recent Trades */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
         {/* Open Positions */}
         <div style={{
           background: 'rgba(30, 41, 59, 0.5)',
@@ -185,6 +296,57 @@ export default function TradingPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Scanner Log */}
+      <div style={{
+        background: 'rgba(30, 41, 59, 0.5)',
+        border: '1px solid rgba(71, 85, 105, 0.4)',
+        borderRadius: '12px',
+        padding: '20px'
+      }}>
+        <h3 style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
+          Scanner Log
+        </h3>
+        {scannerEvents.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
+            <ScanLine className="w-8 h-8" style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+            <p>No scanner events yet</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {scannerEvents.slice(0, 30).map((event) => {
+              const fmt = formatScannerEvent(event);
+              return (
+                <div key={event.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px',
+                  background: 'rgba(15, 23, 42, 0.4)',
+                  borderRadius: '8px',
+                  borderLeft: `3px solid ${fmt.color}`
+                }}>
+                  <div style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: fmt.color
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '13px', color: '#e2e8f0' }}>{fmt.title}</p>
+                    <p style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmt.detail}</p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <p style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace' }}>
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
