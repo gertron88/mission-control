@@ -34,6 +34,16 @@ interface ScannerEvent {
   timestamp: string;
 }
 
+interface LivePriceData {
+  pair_key: string;
+  game_title: string;
+  polymarket_yes: number | null;
+  kalshi_yes: number | null;
+  spread: number | null;
+  arbitrage_pct: number | null;
+  timestamp: string;
+}
+
 interface MatchedPair {
   polymarket_id: string;
   polymarket_question: string;
@@ -52,6 +62,7 @@ export default function TradingPage() {
   const [scannerEvents, setScannerEvents] = useState<ScannerEvent[]>([]);
   const [pairs, setPairs] = useState<MatchedPair[]>([]);
   const [selectedPair, setSelectedPair] = useState<MatchedPair | null>(null);
+  const [livePrices, setLivePrices] = useState<Map<string, LivePriceData>>(new Map());
   const [sseStatus, setSseStatus] = useState<'connecting' | 'live' | 'disconnected'>('connecting');
   const sseRef = useRef<EventSource | null>(null);
 
@@ -109,7 +120,8 @@ export default function TradingPage() {
           data.type === 'SCANNER_MATCH' ||
           data.type === 'SCANNER_HEARTBEAT' ||
           data.type === 'SCANNER_LOG' ||
-          data.type === 'SCANNER_PAIRS'
+          data.type === 'SCANNER_PAIRS' ||
+          data.type === 'LIVE_PRICES'
         ) {
           const evt: ScannerEvent = {
             id: `${data.type}-${Date.now()}`,
@@ -122,6 +134,14 @@ export default function TradingPage() {
           setScannerEvents((prev) => [evt, ...prev].slice(0, 100));
           if (data.type === 'SCANNER_PAIRS' && Array.isArray(data.payload?.pairs)) {
             setPairs(data.payload.pairs);
+          }
+          // Handle LIVE_PRICES updates
+          if (data.type === 'LIVE_PRICES' && data.payload?.pair_key) {
+            setLivePrices((prev) => {
+              const next = new Map(prev);
+              next.set(data.payload.pair_key, data.payload as LivePriceData);
+              return next;
+            });
           }
         }
       } catch {
@@ -177,6 +197,12 @@ export default function TradingPage() {
           title: 'Pairs Update',
           detail: `${event.payload.pairs?.length || 0} pairs refreshed`,
           color: '#2dd4bf'
+        };
+      case 'LIVE_PRICES':
+        return {
+          title: 'Live Prices',
+          detail: `${event.payload.game_title?.substring(0, 30) || 'Unknown'} | PM: ${event.payload.polymarket_yes ? (event.payload.polymarket_yes * 100).toFixed(1) : '-'}¢ KS: ${event.payload.kalshi_yes ? (event.payload.kalshi_yes * 100).toFixed(1) : '-'}¢`,
+          color: '#818cf8'
         };
       default:
         return { title: event.type, detail: 'Scanner event', color: '#94a3b8' };
@@ -270,6 +296,64 @@ export default function TradingPage() {
           </div>
         </div>
       </div>
+
+      {/* Sports Trading Dashboard - Live Prices */}
+      {livePrices.size > 0 && (
+        <div style={{
+          background: 'rgba(30, 41, 59, 0.5)',
+          border: '1px solid rgba(71, 85, 105, 0.4)',
+          borderRadius: '12px',
+          padding: '20px',
+          marginBottom: '24px'
+        }}>
+          <h3 style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
+            Sports Trading Live {sseStatus === 'live' && <span style={{ color: '#34d399', fontSize: '10px', marginLeft: 8 }}>● LIVE</span>}
+          </h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(71, 85, 105, 0.3)' }}>
+                  <th style={{ textAlign: 'left', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Game</th>
+                  <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>PM YES</th>
+                  <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>KS YES</th>
+                  <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Spread</th>
+                  <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Arb %</th>
+                  <th style={{ textAlign: 'center', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from(livePrices.entries()).map(([key, price]) => {
+                  const hasArb = price.arbitrage_pct && price.arbitrage_pct >= 0.035;
+                  return (
+                    <tr key={key} style={{ borderBottom: '1px solid rgba(71, 85, 105, 0.2)' }}>
+                      <td style={{ padding: '10px', color: '#e2e8f0' }}>{price.game_title || key}</td>
+                      <td style={{ textAlign: 'right', padding: '10px', color: '#22d3ee', fontFamily: 'monospace' }}>
+                        {price.polymarket_yes ? `${(price.polymarket_yes * 100).toFixed(1)}¢` : '-'}
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '10px', color: '#f472b6', fontFamily: 'monospace' }}>
+                        {price.kalshi_yes ? `${(price.kalshi_yes * 100).toFixed(1)}¢` : '-'}
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '10px', color: price.spread && Math.abs(price.spread) > 0.02 ? '#fbbf24' : '#94a3b8', fontFamily: 'monospace' }}>
+                        {price.spread ? `${(price.spread * 100).toFixed(1)}¢` : '-'}
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '10px', color: hasArb ? '#34d399' : '#64748b', fontFamily: 'monospace', fontWeight: hasArb ? 700 : 400 }}>
+                        {price.arbitrage_pct ? `${(price.arbitrage_pct * 100).toFixed(2)}%` : '-'}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '10px' }}>
+                        {hasArb ? (
+                          <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '999px', background: 'rgba(52, 211, 153, 0.2)', color: '#34d399', fontWeight: 600 }}>🎯 OPPORTUNITY</span>
+                        ) : (
+                          <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '999px', background: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8' }}>Watching</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Positions & Recent Trades */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
