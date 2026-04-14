@@ -95,6 +95,17 @@ export default function TradingPage() {
             )[0];
             setPairs(latest.payload?.pairs || []);
           }
+          // Hydrate live prices from historical LIVE_PRICES events
+          const priceEvents = scannerData.filter((e) => e.type === 'LIVE_PRICES');
+          const pricesMap = new Map<string, LivePriceData>();
+          // Process in reverse order (oldest first) so latest overwrites
+          priceEvents.reverse().forEach((e) => {
+            const payload = e.payload as LivePriceData;
+            if (payload?.pair_key) {
+              pricesMap.set(payload.pair_key, payload);
+            }
+          });
+          setLivePrices(pricesMap);
         }
       } catch (err) {
         setPositions([]);
