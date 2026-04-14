@@ -298,7 +298,7 @@ export default function TradingPage() {
       </div>
 
       {/* Sports Trading Dashboard - Live Prices */}
-      {livePrices.size > 0 && (
+      {pairs.length > 0 && (
         <div style={{
           background: 'rgba(30, 41, 59, 0.5)',
           border: '1px solid rgba(71, 85, 105, 0.4)',
@@ -308,6 +308,7 @@ export default function TradingPage() {
         }}>
           <h3 style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
             Sports Trading Live {sseStatus === 'live' && <span style={{ color: '#34d399', fontSize: '10px', marginLeft: 8 }}>● LIVE</span>}
+            {sseStatus !== 'live' && <span style={{ color: '#fbbf24', fontSize: '10px', marginLeft: 8 }}>○ {sseStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}</span>}
           </h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -322,22 +323,24 @@ export default function TradingPage() {
                 </tr>
               </thead>
               <tbody>
-                {Array.from(livePrices.entries()).map(([key, price]) => {
-                  const hasArb = price.arbitrage_pct && price.arbitrage_pct >= 0.035;
+                {pairs.map((pair) => {
+                  const key = `${pair.polymarket_id}::${pair.kalshi_ticker}`;
+                  const price = livePrices.get(key);
+                  const hasArb = price?.arbitrage_pct && price.arbitrage_pct >= 0.035;
                   return (
                     <tr key={key} style={{ borderBottom: '1px solid rgba(71, 85, 105, 0.2)' }}>
-                      <td style={{ padding: '10px', color: '#e2e8f0' }}>{price.game_title || key}</td>
+                      <td style={{ padding: '10px', color: '#e2e8f0' }}>{pair.polymarket_question || key}</td>
                       <td style={{ textAlign: 'right', padding: '10px', color: '#22d3ee', fontFamily: 'monospace' }}>
-                        {price.polymarket_yes ? `${(price.polymarket_yes * 100).toFixed(1)}¢` : '-'}
+                        {price?.polymarket_yes ? `${(price.polymarket_yes * 100).toFixed(1)}¢` : '-'}
                       </td>
                       <td style={{ textAlign: 'right', padding: '10px', color: '#f472b6', fontFamily: 'monospace' }}>
-                        {price.kalshi_yes ? `${(price.kalshi_yes * 100).toFixed(1)}¢` : '-'}
+                        {price?.kalshi_yes ? `${(price.kalshi_yes * 100).toFixed(1)}¢` : '-'}
                       </td>
-                      <td style={{ textAlign: 'right', padding: '10px', color: price.spread && Math.abs(price.spread) > 0.02 ? '#fbbf24' : '#94a3b8', fontFamily: 'monospace' }}>
-                        {price.spread ? `${(price.spread * 100).toFixed(1)}¢` : '-'}
+                      <td style={{ textAlign: 'right', padding: '10px', color: price?.spread && Math.abs(price.spread) > 0.02 ? '#fbbf24' : '#94a3b8', fontFamily: 'monospace' }}>
+                        {price?.spread ? `${(price.spread * 100).toFixed(1)}¢` : '-'}
                       </td>
                       <td style={{ textAlign: 'right', padding: '10px', color: hasArb ? '#34d399' : '#64748b', fontFamily: 'monospace', fontWeight: hasArb ? 700 : 400 }}>
-                        {price.arbitrage_pct ? `${(price.arbitrage_pct * 100).toFixed(2)}%` : '-'}
+                        {price?.arbitrage_pct ? `${(price.arbitrage_pct * 100).toFixed(2)}%` : '-'}
                       </td>
                       <td style={{ textAlign: 'center', padding: '10px' }}>
                         {hasArb ? (
