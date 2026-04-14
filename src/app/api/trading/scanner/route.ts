@@ -15,6 +15,10 @@ export async function POST(request: NextRequest) {
       payload,
     } = body;
 
+    // Validate and normalize event type
+    const validTypes = ['SCANNER_OPPORTUNITY', 'SCANNER_MATCH', 'SCANNER_HEARTBEAT', 'SCANNER_LOG', 'SCANNER_PAIRS', 'LIVE_PRICES', 'LOW_BALANCE_ALERT'];
+    const normalizedType = validTypes.includes(type) ? type : 'SCANNER_LOG';
+
     if (!type || !payload) {
       return NextResponse.json(
         { success: false, error: 'Missing type or payload' },
@@ -25,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Store in generic Event store
     const event = await prisma.event.create({
       data: {
-        type,
+        type: normalizedType,
         aggregateType: 'SCANNER',
         aggregateId: agentId,
         payload,
