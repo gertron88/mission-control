@@ -54,6 +54,94 @@ interface MatchedPair {
   confidence: number;
   verified: boolean;
   match_reason?: string;
+  game_time?: string; // ISO timestamp if available
+}
+
+// Parse game time from Kalshi ticker format: KX{LEAGUE}GAME-26APR14MIACHA-MIA
+function parseGameTimeFromTicker(ticker: string): Date | null {
+  // Match pattern: 26APR14 or 26APR141800 (date + optional time)
+  const match = ticker.match(/26([A-Z]{3})(\d{2})(\d{4})?/);
+  if (!match) return null;
+  
+  const monthMap: Record<string, number> = {
+    JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
+    JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11
+  };
+  
+  const month = monthMap[match[1]];
+  const day = parseInt(match[2], 10);
+  const timeStr = match[3]; // e.g., "1840" for 6:40 PM
+  
+  if (month === undefined || isNaN(day)) return null;
+  
+  const year = 2026;
+  let hours = 19; // Default 7 PM ET for games
+  let minutes = 0;
+  
+  if (timeStr && timeStr.length === 4) {
+    hours = parseInt(timeStr.substring(0, 2), 10);
+    minutes = parseInt(timeStr.substring(2, 4), 10);
+  }
+  
+  // Create date in ET (America/New_York)
+  const date = new Date(Date.UTC(year, month, day, hours + 4, minutes)); // +4 for ET to UTC
+  return date;
+}
+
+// Check if a game is currently live (within 4 hours of start time, or if we have price activity)
+function isGameLive(pair: MatchedPair, livePrices: Map<string, LivePriceData>): boolean {
+  const key = `${pair.polymarket_id}::${pair.kalshi_ticker}`;
+  const price = livePrices.get(key);
+  
+  // If we have actual price updates, game is definitely active
+  if (price?.polymarket_yes !== null || price?.kalshi_yes !== null) {
+    return true;
+  }
+  
+  // Check if game time is within next 4 hours or last 3 hours (typical game window)
+  const gameTime = parseGameTimeFromTicker(pair.kalshi_ticker);
+  if (!gameTime) return false;
+  
+  const now = new Date();
+  const hoursUntilGame = (gameTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+  
+  // Game is "live" if it starts within 2 hours or started within last 3 hours
+  return hoursUntilGame <= 2 && hoursUntilGame >= -3;
+}
+
+// Get game status text
+function getGameStatus(pair: MatchedPair, livePrices: Map<string, LivePriceData>): { text: string; color: string; isLive: boolean } {
+  const key = `${pair.polymarket_id}::${pair.kalshi_ticker}`;
+  const price = livePrices.get(key);
+  const gameTime = parseGameTimeFromTicker(pair.kalshi_ticker);
+  
+  // Has price activity = actively trading
+  if (price?.polymarket_yes !== null || price?.kalshi_yes !== null) {
+    return { text: '🔴 LIVE', color: '#ef4444', isLive: true };
+  }
+  
+  if (!gameTime) {
+    return { text: 'Upcoming', color: '#94a3b8', isLive: false };
+  }
+  
+  const now = new Date();
+  const hoursUntil = (gameTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+  
+  if (hoursUntil < 0) {
+    return { text: 'In Progress', color: '#ef4444', isLive: true };
+  }
+  if (hoursUntil <= 1) {
+    return { text: 'Starting Soon', color: '#fbbf24', isLive: true };
+  }
+  if (hoursUntil <= 4) {
+    return { text: 'Today', color: '#22d3ee', isLive: true };
+  }
+  
+  // Format date
+  const days = Math.floor(hoursUntil / 24);
+  if (days === 0) return { text: 'Tomorrow', color: '#94a3b8', isLive: false };
+  if (days === 1) return { text: 'In 2 days', color: '#94a3b8', isLive: false };
+  return { text: `In ${days} days`, color: '#94a3b8', isLive: false };
 }
 
 export default function TradingPage() {
@@ -322,28 +410,62 @@ export default function TradingPage() {
             {sseStatus !== 'live' && <span style={{ color: '#fbbf24', fontSize: '10px', marginLeft: 8 }}>○ {sseStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}</span>}
           </h3>
           <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px' }}>
-            {pairs.length} pairs tracked
+            {pairs.length} pairs tracked • 🔴 Live games shown first
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(71, 85, 105, 0.3)' }}>
                   <th style={{ textAlign: 'left', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Game</th>
+                  <th style={{ textAlign: 'center', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Status</th>
                   <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>PM YES</th>
                   <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>KS YES</th>
                   <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Spread</th>
                   <th style={{ textAlign: 'right', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Arb %</th>
-                  <th style={{ textAlign: 'center', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Status</th>
+                  <th style={{ textAlign: 'center', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Trade</th>
                 </tr>
               </thead>
               <tbody>
-                {pairs.map((pair) => {
+                {[...pairs]
+                  .sort((a, b) => {
+                    const aStatus = getGameStatus(a, livePrices);
+                    const bStatus = getGameStatus(b, livePrices);
+                    // Live games first, then by confidence
+                    if (aStatus.isLive && !bStatus.isLive) return -1;
+                    if (!aStatus.isLive && bStatus.isLive) return 1;
+                    return (b.confidence || 0) - (a.confidence || 0);
+                  })
+                  .map((pair) => {
                   const key = `${pair.polymarket_id}::${pair.kalshi_ticker}`;
                   const price = livePrices.get(key);
                   const hasArb = price?.arbitrage_pct && price.arbitrage_pct >= 0.035;
+                  const status = getGameStatus(pair, livePrices);
+                  const gameTime = parseGameTimeFromTicker(pair.kalshi_ticker);
                   return (
-                    <tr key={key} style={{ borderBottom: '1px solid rgba(71, 85, 105, 0.2)' }}>
-                      <td style={{ padding: '10px', color: '#e2e8f0' }}>{pair.polymarket_question || key}</td>
+                    <tr key={key} style={{ 
+                      borderBottom: '1px solid rgba(71, 85, 105, 0.2)',
+                      background: status.isLive ? 'rgba(239, 68, 68, 0.05)' : 'transparent'
+                    }}>
+                      <td style={{ padding: '10px', color: '#e2e8f0' }}>
+                        <div>{pair.polymarket_question || key}</div>
+                        {gameTime && (
+                          <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+                            {gameTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {gameTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '10px' }}>
+                        <span style={{ 
+                          fontSize: '10px', 
+                          padding: '3px 8px', 
+                          borderRadius: '999px', 
+                          background: status.isLive ? 'rgba(239, 68, 68, 0.2)' : 'rgba(148, 163, 184, 0.15)', 
+                          color: status.color,
+                          fontWeight: 600 
+                        }}>
+                          {status.text}
+                        </span>
+                      </td>
                       <td style={{ textAlign: 'right', padding: '10px', color: '#22d3ee', fontFamily: 'monospace' }}>
                         {price?.polymarket_yes ? `${(price.polymarket_yes * 100).toFixed(1)}¢` : '-'}
                       </td>
