@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
       id, 
       handle, 
       name, 
-      description = '', 
       maxLoad = 5,
       dailyTaskLimit = 100 
     } = body;
@@ -34,7 +33,6 @@ export async function POST(request: NextRequest) {
         id,
         handle,
         name: name || handle,
-        description,
         status: 'ONLINE',
         maxLoad,
         dailyTaskLimit,
