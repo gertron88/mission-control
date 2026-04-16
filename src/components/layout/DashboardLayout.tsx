@@ -26,10 +26,27 @@ export default function DashboardLayout({ children, title, subtitle, actions }: 
 
   return (
     <div style={{ minHeight: '100vh', background: '#020617', display: 'flex' }}>
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .main-content {
+            margin-left: 0 !important;
+          }
+          .topbar {
+            padding: 12px 16px !important;
+          }
+          .topbar h1 {
+            font-size: 14px !important;
+          }
+          .content-area {
+            padding: 16px !important;
+          }
+        }
+      `}</style>
       <Sidebar />
-      <div style={{ flex: 1, marginLeft: '256px', minWidth: 0, transition: 'margin 0.3s' }}>
+      <div className="main-content" style={{ flex: 1, marginLeft: '256px', minWidth: 0, transition: 'margin 0.3s' }}>
         {/* Topbar */}
         <div
+          className="topbar"
           style={{
             position: 'sticky',
             top: 0,
@@ -104,7 +121,7 @@ export default function DashboardLayout({ children, title, subtitle, actions }: 
           </div>
         </div>
         {/* Content */}
-        <main style={{ padding: '24px' }}>
+        <main className="content-area" style={{ padding: '24px' }}>
           {children}
         </main>
       </div>

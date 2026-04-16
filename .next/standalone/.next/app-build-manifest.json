@@ -24,6 +24,15 @@
       "static/chunks/350-c8d18826ca92f7e4.js",
       "static/chunks/app/agents/page-0b2bb090e32b9dab.js"
     ],
+    "/operations/page": [
+      "static/chunks/webpack-a785c941f80c2152.js",
+      "static/chunks/fd9d1056-211f0c774853bd6b.js",
+      "static/chunks/23-481e9fb48e7ea75e.js",
+      "static/chunks/main-app-696bbb19a39cdd46.js",
+      "static/chunks/544-cac5d26c7bbac8af.js",
+      "static/chunks/350-c8d18826ca92f7e4.js",
+      "static/chunks/app/operations/page-bffba21c6482190e.js"
+    ],
     "/page": [
       "static/chunks/webpack-a785c941f80c2152.js",
       "static/chunks/fd9d1056-211f0c774853bd6b.js",
@@ -58,16 +67,7 @@
       "static/chunks/main-app-696bbb19a39cdd46.js",
       "static/chunks/544-cac5d26c7bbac8af.js",
       "static/chunks/350-c8d18826ca92f7e4.js",
-      "static/chunks/app/trading/page-0d9ad9ae5a96b4ed.js"
-    ],
-    "/operations/page": [
-      "static/chunks/webpack-a785c941f80c2152.js",
-      "static/chunks/fd9d1056-211f0c774853bd6b.js",
-      "static/chunks/23-481e9fb48e7ea75e.js",
-      "static/chunks/main-app-696bbb19a39cdd46.js",
-      "static/chunks/544-cac5d26c7bbac8af.js",
-      "static/chunks/350-c8d18826ca92f7e4.js",
-      "static/chunks/app/operations/page-bffba21c6482190e.js"
+      "static/chunks/app/trading/page-7c995e42317ef537.js"
     ],
     "/kill-switch/page": [
       "static/chunks/webpack-a785c941f80c2152.js",

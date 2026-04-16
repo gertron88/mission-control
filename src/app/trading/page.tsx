@@ -317,8 +317,64 @@ export default function TradingPage() {
       title="Trading"
       subtitle={`${positions.length} open positions • $${totalPnl.toFixed(2)} P&L`}
     >
+      {/* Responsive Styles */}
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 12px !important;
+          }
+          .stats-grid > div {
+            padding: 12px !important;
+          }
+          .stats-grid .stat-value {
+            font-size: 18px !important;
+          }
+          .status-bar {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .status-bar > div {
+            padding: 12px !important;
+          }
+          .pairs-table th,
+          .pairs-table td {
+            padding: 8px 6px !important;
+            font-size: 11px !important;
+          }
+          .pairs-table th:nth-child(3),
+          .pairs-table th:nth-child(4),
+          .pairs-table th:nth-child(5),
+          .pairs-table td:nth-child(3),
+          .pairs-table td:nth-child(4),
+          .pairs-table td:nth-child(5) {
+            display: none !important;
+          }
+          .positions-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+          .pairs-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .modal-content {
+            max-width: 95vw !important;
+            padding: 16px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .stats-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .pairs-table th:nth-child(6),
+          .pairs-table td:nth-child(6) {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'Total P&L', value: `$${totalPnl.toFixed(2)}`, color: totalPnl >= 0 ? '#34d399' : '#f87171', icon: DollarSign },
           { label: 'Open Positions', value: positions.length.toString(), color: '#22d3ee', icon: Activity },
@@ -335,7 +391,7 @@ export default function TradingPage() {
               <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>{stat.label}</span>
             </div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: stat.color, fontFamily: 'monospace' }}>
+            <div className="stat-value" style={{ fontSize: '24px', fontWeight: 700, color: stat.color, fontFamily: 'monospace' }}>
               {stat.value}
             </div>
           </div>
@@ -343,7 +399,7 @@ export default function TradingPage() {
       </div>
 
       {/* Scanner Status Bar */}
-      <div style={{
+      <div className="status-bar" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '16px',
@@ -417,7 +473,7 @@ export default function TradingPage() {
             {pairs.length} pairs tracked • 🔴 Live games shown first
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <table className="pairs-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(71, 85, 105, 0.3)' }}>
                   <th style={{ textAlign: 'left', padding: '10px', color: '#94a3b8', fontWeight: 600 }}>Game</th>
@@ -499,7 +555,7 @@ export default function TradingPage() {
       )}
 
       {/* Positions & Recent Trades */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+      <div className="positions-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
         {/* Open Positions */}
         <div style={{
           background: 'rgba(30, 41, 59, 0.5)',
@@ -610,7 +666,7 @@ export default function TradingPage() {
             <p>No matched pairs yet</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+          <div className="pairs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
             {pairs.map((pair, idx) => (
               <div
                 key={`${pair.polymarket_id}-${pair.kalshi_ticker}-${idx}`}
@@ -719,6 +775,7 @@ export default function TradingPage() {
           }}
         >
           <div
+            className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#1e293b',

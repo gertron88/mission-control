@@ -97,21 +97,83 @@ export default function Sidebar() {
   };
 
   return (
-    <aside
-      style={{
+    <>
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .sidebar {
+            display: none !important;
+          }
+          .mobile-nav {
+            display: flex !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .mobile-nav {
+            display: none !important;
+          }
+        }
+      `}</style>
+      
+      {/* Mobile Bottom Navigation */}
+      <nav className="mobile-nav" style={{
         position: 'fixed',
+        bottom: 0,
         left: 0,
-        top: 0,
-        height: '100%',
-        zIndex: 30,
-        display: 'flex',
-        flexDirection: 'column',
-        width: collapsed ? '64px' : '256px',
+        right: 0,
+        height: '64px',
         background: 'rgba(10, 17, 32, 0.98)',
-        borderRight: '1px solid rgba(51, 65, 85, 0.5)',
-        transition: 'width 0.3s',
-      }}
-    >
+        borderTop: '1px solid rgba(51, 65, 85, 0.5)',
+        zIndex: 40,
+        display: 'none',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        padding: '0 8px',
+      }}>
+        {navItems.slice(0, 5).map((item) => {
+          const active = isActive(item.path);
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                color: active ? '#67e8f9' : '#94a3b8',
+                background: active ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+                minWidth: '60px',
+              }}
+            >
+              <div style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {item.icon}
+              </div>
+              <span style={{ fontSize: '10px', fontWeight: 500 }}>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <aside
+        className="sidebar"
+        style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          height: '100%',
+          zIndex: 30,
+          display: 'flex',
+          flexDirection: 'column',
+          width: collapsed ? '64px' : '256px',
+          background: 'rgba(10, 17, 32, 0.98)',
+          borderRight: '1px solid rgba(51, 65, 85, 0.5)',
+          transition: 'width 0.3s',
+        }}
+      >
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid rgba(30, 41, 59, 0.6)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -267,6 +329,7 @@ export default function Sidebar() {
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
