@@ -175,14 +175,6 @@ export default function TradingPage() {
         if (scannerRes.ok) {
           const scannerData: ScannerEvent[] = await scannerRes.json();
           setScannerEvents(scannerData);
-          // Hydrate pairs from historical SCANNER_PAIRS events
-          const pairEvents = scannerData.filter((e) => e.type === 'SCANNER_PAIRS');
-          if (pairEvents.length > 0) {
-            const latest = pairEvents.sort(
-              (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-            )[0];
-            setPairs(latest.payload?.pairs || []);
-          }
           // Hydrate live prices from historical LIVE_PRICES events
           const priceEvents = scannerData.filter((e) => e.type === 'LIVE_PRICES');
           const pricesMap = new Map<string, LivePriceData>();
@@ -194,6 +186,18 @@ export default function TradingPage() {
             }
           });
           setLivePrices(pricesMap);
+        }
+        
+        // Fetch pairs separately (they're less frequent than LIVE_PRICES)
+        const pairsRes = await fetch('/api/trading/scanner?limit=5&type=SCANNER_PAIRS');
+        if (pairsRes.ok) {
+          const pairsData: ScannerEvent[] = await pairsRes.json();
+          if (pairsData.length > 0) {
+            const latest = pairsData.sort(
+              (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            )[0];
+            setPairs(latest.payload?.pairs || []);
+          }
         }
       } catch (err) {
         setPositions([]);
