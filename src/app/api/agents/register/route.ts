@@ -21,7 +21,9 @@ export async function POST(request: NextRequest) {
       id, 
       handle, 
       name, 
-      description = '', 
+      role = 'CUSTOM',
+      model = 'kimi/kimi-code',
+      apiKeyRef,
       maxLoad = 5,
       dailyTaskLimit = 100 
     } = body;
@@ -58,7 +60,9 @@ export async function POST(request: NextRequest) {
         id,
         handle,
         name: name || handle,
-        description,
+        role,
+        model,
+        apiKeyRef: apiKeyRef || `api-key-${handle}`,
         status: 'ONLINE',
         maxLoad,
         dailyTaskLimit,
