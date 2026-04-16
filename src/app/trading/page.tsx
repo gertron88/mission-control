@@ -308,28 +308,44 @@ export default function TradingPage() {
     });
   }, [sseEvents]);
 
-  // Periodic API refresh as fallback (every 30s)
+  // Aggressive API fallback polling (every 5s when SSE fails)
   useEffect(() => {
-    const interval = setInterval(async () => {
+    let isActive = true;
+    
+    const poll = async () => {
+      if (!isActive) return;
+      
       try {
         const res = await fetch('/api/trading/scanner?limit=20&type=LIVE_PRICES');
-        if (res.ok) {
+        if (res.ok && isActive) {
           const events: ScannerEvent[] = await res.json();
-          const pricesMap = new Map(livePrices);
-          events.reverse().forEach((e) => {
-            const payload = e.payload as LivePriceData;
-            if (payload?.pair_key) pricesMap.set(payload.pair_key, payload);
-          });
-          setLivePrices(pricesMap);
-          setLastFetchTime(new Date());
+          if (events.length > 0) {
+            const pricesMap = new Map<string, LivePriceData>();
+            events.reverse().forEach((e) => {
+              const payload = e.payload as LivePriceData;
+              if (payload?.pair_key) pricesMap.set(payload.pair_key, payload);
+            });
+            setLivePrices(pricesMap);
+            setLastFetchTime(new Date());
+          }
         }
       } catch (err) {
-        console.error('Periodic refresh failed:', err);
+        console.error('Poll failed:', err);
       }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [livePrices]);
+      
+      // Poll faster when disconnected/stale, slower when live
+      const isHealthy = sseStatus === 'live' && !isStale;
+      const delay = isHealthy ? 10000 : 5000;
+      
+      if (isActive) {
+        setTimeout(poll, delay);
+      }
+    };
+    
+    poll();
+    
+    return () => { isActive = false; };
+  }, [sseStatus, isStale]);
 
   const totalPnl = positions.reduce((sum, p) => sum + p.pnl, 0);
   const opportunityCount = sseEvents.filter((e) => e.type === 'SCANNER_OPPORTUNITY').length;
