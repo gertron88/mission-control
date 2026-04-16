@@ -430,11 +430,17 @@ export default function TradingPage() {
             color: sseStatus === 'live' && !isStale ? '#34d399' : sseStatus === 'connecting' ? '#fbbf24' : '#f87171'
           }}>
             {sseStatus === 'live' && !isStale ? 'Live Feed Connected' : 
-             sseStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+             sseStatus === 'connecting' ? 'Connecting...' : 'Using API Polling'}
           </span>
           <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '8px' }}>
-            {lastMessageAt ? `Last update: ${Math.round((Date.now() - lastMessageAt.getTime()) / 1000)}s ago` : 'Waiting for data...'}
+            {lastMessageAt ? `Last update: ${Math.round((Date.now() - lastMessageAt.getTime()) / 1000)}s ago` : 
+             lastFetchTime ? `API poll: ${Math.round((Date.now() - lastFetchTime.getTime()) / 1000)}s ago` : 'Waiting for data...'}
           </span>
+          {!isStale && sseStatus !== 'live' && (
+            <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: '8px' }}>
+              (5s polling mode - add Redis for real-time)
+            </span>
+          )}
         </div>
         
         {(isStale || sseStatus === 'disconnected') && (
