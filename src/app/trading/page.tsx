@@ -469,8 +469,11 @@ export default function TradingPage() {
             Sports Trading Live {sseStatus === 'live' && <span style={{ color: '#34d399', fontSize: '10px', marginLeft: 8 }}>● LIVE</span>}
             {sseStatus !== 'live' && <span style={{ color: '#fbbf24', fontSize: '10px', marginLeft: 8 }}>○ {sseStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}</span>}
           </h3>
-          <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px' }}>
-            {pairs.length} pairs tracked • 🔴 Live games shown first
+          <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <span>{pairs.length} pairs tracked • 🔴 Live games shown first</span>
+            <span style={{ fontSize: '10px', color: '#64748b' }}>
+              💡 Spread = PM - KS | Positive = PM higher | Negative = KS higher
+            </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="pairs-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
